@@ -524,3 +524,43 @@
     animation-iteration-count: 1 !important;
   }
 }
+
+@media (max-width: 650px) {
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .app-layout,
+  .main-layout,
+  .dashboard-content {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .sidebar {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sidebar-nav {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .sidebar-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .task-board,
+  .task-column,
+  .task-card {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
