@@ -33,6 +33,24 @@ This project is developed as part of the Front-End Intern Challenge.
 | Person 3 | Drag and Drop |
 | Person 4 | Mock API and Data Management |
 
+# Person 1:
+```text
+git checkout -b feature/dashboard-ui
+```
+# Person 2:
+```text
+git checkout -b feature/task-crud
+```
+
+# Person 3:
+```text
+git checkout -b feature/drag-drop
+```
+
+# Person 4:
+```text
+git checkout -b feature/api-data
+```
 ## Main Features
 
 - Create, edit and delete tasks
@@ -50,10 +68,23 @@ This project is developed as part of the Front-End Intern Challenge.
 ```text
 src/
 ├── components/
+│   ├── Header.jsx
+│   ├── TaskCard.jsx
+│   ├── TaskColumn.jsx
+│   ├── TaskModal.jsx
+│   └── SearchFilter.jsx
+│
 ├── services/
+│   └── taskApi.js
+│
 ├── hooks/
+│   └── useTasks.js
+│
 ├── utils/
+│   └── taskHelpers.js
+│
 ├── tests/
+│
 ├── App.jsx
 ├── main.jsx
 └── index.css
