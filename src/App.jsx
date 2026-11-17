@@ -1,5 +1,6 @@
 
 import Header from "./components/Header";
+import TaskColumn from "./components/TaskColumn";
 import "./App.css";
 
 const taskColumns = [
@@ -72,32 +73,7 @@ function App() {
 
           <div className="task-board">
             {taskColumns.map((column) => (
-              <section className="task-column" key={column.id}>
-                <div className="column-heading">
-                  <div className="column-title">
-                    <span className={`status-dot ${column.color}`}></span>
-                    <h2>{column.title}</h2>
-                  </div>
-                  <span className="task-count">
-                    {column.tasks.length}
-                  </span>
-                </div>
-
-                <div className="column-tasks">
-                  {column.tasks.map((task) => (
-                    <article className="task-card" key={task.id}>
-                      <h3>{task.title}</h3>
-
-                      <div className="task-card-footer">
-                        <span className="task-label">{task.label}</span>
-                        <span className={`priority ${task.priority.toLowerCase()}`}>
-                          {task.priority}
-                        </span>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
+              <TaskColumn key={column.id} column={column} />
             ))}
           </div>
         </section>
