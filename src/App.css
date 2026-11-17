@@ -175,3 +175,170 @@
     white-space: nowrap;
   }
 }
+
+.task-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.task-column {
+  min-width: 0;
+  padding: 17px;
+  background: #edf4fb;
+  border: 1px solid #e1eaf3;
+  border-radius: 12px;
+}
+
+.column-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 17px;
+}
+
+.column-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.column-title h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.status-dot.blue {
+  background: #65a9ed;
+}
+
+.status-dot.orange {
+  background: #e9a45c;
+}
+
+.status-dot.green {
+  background: #62b98a;
+}
+
+.task-count {
+  min-width: 25px;
+  padding: 4px 7px;
+  text-align: center;
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.column-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-card {
+  padding: 15px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.task-card h3 {
+  margin: 0 0 17px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.task-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.task-label,
+.priority {
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.task-label {
+  background: #eaf3fc;
+  color: #3978b5;
+}
+
+.priority.high {
+  background: #fff0ed;
+  color: #d66d5c;
+}
+
+.priority.medium {
+  background: #fff5e6;
+  color: #b98132;
+}
+
+.priority.low {
+  background: #e9f7ef;
+  color: #39875c;
+}
+
+@media (max-width: 1000px) {
+  .task-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 650px) {
+  .task-board {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 650px) {
+  .main-layout {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .dashboard-content {
+    width: 100%;
+    min-width: 0;
+    padding: 20px 14px;
+  }
+
+  .task-board {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .task-column,
+  .task-card {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .dashboard-heading {
+    flex-wrap: wrap;
+  }
+
+  .sidebar-nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .nav-link {
+    white-space: nowrap;
+    padding: 9px 7px;
+  }
+}
