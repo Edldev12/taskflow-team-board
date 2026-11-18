@@ -44,16 +44,19 @@ function App() {
   const [columns, setColumns] = useState(taskColumns);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const triggerRef = useRef(null);
+  const returnFocusRef = useRef(null);
   const [selectedTask, setSelectedTask] = useState(null);
   function toggleTheme(selectedTheme) {
     setTheme(selectedTheme);
   }
   function openCreateModal() {
+    returnFocusRef.current = triggerRef.current;
     setSelectedTask(null);
     setIsModalOpen(true);
   }
 
-  function openEditModal(task) {
+  function openEditModal(task, triggerElement) {
+    returnFocusRef.current = triggerElement;
     setSelectedTask(task);
     setIsModalOpen(true);
   }
@@ -235,7 +238,7 @@ function App() {
             onClose={closeModal}
             onSave={saveTask}
             task={selectedTask}
-            returnFocusRef={triggerRef}
+            returnFocusRef={returnFocusRef}
           />
         )}
       </main>

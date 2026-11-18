@@ -18,7 +18,7 @@ function TaskCard({ task, onEdit, onDelete }) {
         <button
           type="button"
           className="task-edit-button"
-          onClick={() => onEdit(task)}
+          onClick={(event) => onEdit(task, event.currentTarget)}
           aria-label={`Edit ${task.title}`}
         >
           Edit

@@ -19,6 +19,7 @@ function TaskModal({ isOpen, onClose, onSave, task, returnFocusRef }) {
     if (!isOpen) return;
 
     const modal = modalRef.current;
+    const elementToRestore = returnFocusRef?.current;
 
     const focusableElements = modal.querySelectorAll(
       'button, input, textarea, select, [tabindex]:not([tabindex="-1"])'
@@ -52,7 +53,7 @@ function TaskModal({ isOpen, onClose, onSave, task, returnFocusRef }) {
 
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      returnFocusRef?.focus();
+      elementToRestore?.focus();
     };
   }, [isOpen, onClose, returnFocusRef]);
 
