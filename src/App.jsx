@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Header from "./components/Header";
 import TaskColumn from "./components/TaskColumn";
 import "./App.css";
@@ -43,6 +43,7 @@ function App() {
   const [theme, setTheme] = useState("light");
   const [columns, setColumns] = useState(taskColumns);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const triggerRef = useRef(null);
   const [selectedTask, setSelectedTask] = useState(null);
   function toggleTheme(selectedTheme) {
     setTheme(selectedTheme);
@@ -201,6 +202,7 @@ function App() {
             </button>
             */}
             <button
+              ref={triggerRef}
               className="add-task-button"
               onClick={openCreateModal}
               type="button"
@@ -233,6 +235,7 @@ function App() {
             onClose={closeModal}
             onSave={saveTask}
             task={selectedTask}
+            returnFocusRef={triggerRef}
           />
         )}
       </main>

@@ -1,8 +1,8 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./TaskModal.css";
 
-function TaskModal({ isOpen, onClose, onSave, task }) {
+function TaskModal({ isOpen, onClose, onSave, task, returnFocusRef }) {
   const [formData, setFormData] = useState(() => ({
     title: task?.title || "",
     description: task?.description || "",
@@ -11,22 +11,50 @@ function TaskModal({ isOpen, onClose, onSave, task }) {
   }));
 
   const [error, setError] = useState("");
+  const modalRef = useRef(null);
 
   const isEditing = Boolean(task);
 
   useEffect(() => {
     if (!isOpen) return;
 
-    function handleEscape(event) {
+    const modal = modalRef.current;
+
+    const focusableElements = modal.querySelectorAll(
+      'button, input, textarea, select, [tabindex]:not([tabindex="-1"])'
+    );
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    firstElement?.focus();
+
+    function handleKeyDown(event) {
       if (event.key === "Escape") {
         onClose();
       }
+
+      if (event.key === "Tab") {
+        if (event.shiftKey && document.activeElement === firstElement) {
+          event.preventDefault();
+          lastElement?.focus();
+        } else if (
+          !event.shiftKey &&
+          document.activeElement === lastElement
+        ) {
+          event.preventDefault();
+          firstElement?.focus();
+        }
+      }
     }
 
-    window.addEventListener("keydown", handleEscape);
+    document.addEventListener("keydown", handleKeyDown);
 
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [isOpen, onClose]);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      returnFocusRef?.focus();
+    };
+  }, [isOpen, onClose, returnFocusRef]);
 
   if (!isOpen) return null;
 
@@ -77,10 +105,12 @@ function TaskModal({ isOpen, onClose, onSave, task }) {
       }}
     >
       <section
+        ref={modalRef}
         className="task-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="task-modal-title"
+        aria-describedby={error ? "task-form-error" : undefined}
       >
         <div className="modal-header">
           <h2 id="task-modal-title">
@@ -108,7 +138,6 @@ function TaskModal({ isOpen, onClose, onSave, task }) {
               placeholder="Enter task title"
               maxLength={100}
               required
-              autoFocus
             />
           </div>
 
@@ -152,7 +181,7 @@ function TaskModal({ isOpen, onClose, onSave, task }) {
           </div>
 
           {error && (
-            <p className="form-error" role="alert">
+            <p id="task-form-error" className="form-error" role="alert">
               {error}
             </p>
           )}
