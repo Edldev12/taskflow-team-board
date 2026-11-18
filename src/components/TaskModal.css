@@ -1,0 +1,152 @@
+/* Modal overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+/* Modal container */
+.task-modal {
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 25px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+/* Modal header */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 24px;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 21px;
+  color: var(--text);
+}
+
+.modal-close {
+  width: 35px;
+  height: 35px;
+  border: none;
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--text);
+  font-size: 25px;
+  cursor: pointer;
+}
+
+/* Form */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.form-group label {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--background);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.form-group textarea {
+  resize: vertical;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  border-color: #72b7f5;
+  box-shadow: 0 0 0 3px rgba(114, 183, 245, 0.2);
+}
+
+/* Validation error */
+.form-error {
+  margin: 0 0 15px;
+  color: #dc5145;
+  font-size: 13px;
+}
+
+/* Modal buttons */
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 25px;
+}
+
+.cancel-button,
+.save-button {
+  padding: 11px 17px;
+  border: none;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.cancel-button {
+  background: var(--background);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.save-button {
+  background: #72b7f5;
+  color: #102b45;
+}
+
+.cancel-button:hover,
+.save-button:hover,
+.modal-close:hover {
+  filter: brightness(0.95);
+}
+
+.task-modal button:focus-visible {
+  outline: 3px solid #2876bd;
+  outline-offset: 3px;
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .task-modal {
+    padding: 20px;
+  }
+
+  .modal-header h2 {
+    font-size: 18px;
+  }
+
+  .modal-actions button {
+    flex: 1;
+  }
+}
