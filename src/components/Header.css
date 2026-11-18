@@ -1,0 +1,144 @@
+
+.top-header {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 30px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.header-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 650px;
+  min-width: 0;
+  padding: 12px 16px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.search-icon {
+  color: var(--muted);
+  font-size: 23px;
+}
+
+.header-search input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.label-filter {
+  min-width: 125px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.notification-button {
+  position: relative;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 25px;
+  cursor: pointer;
+}
+
+.notification-count {
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #e85d6a;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.header-profile .profile-avatar,
+.profile-avatar {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #dceeff;
+  color: #2876bd;
+  font-weight: 700;
+}
+@media (max-width: 1000px) {
+  .top-header {
+    flex-wrap: wrap;
+  }
+
+  .header-search {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+@media (max-width: 650px) {
+  .top-header {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    gap: 12px;
+  }
+
+  .header-search {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 16px;
+  }
+
+  .label-filter {
+    min-width: 0;
+    max-width: 105px;
+    padding: 10px 7px;
+    font-size: 11px;
+  }
+
+  .notification-button {
+    font-size: 21px;
+  }
+
+  .header-profile .profile-avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 12px;
+  }
+}
