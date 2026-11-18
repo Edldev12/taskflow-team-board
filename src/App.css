@@ -1,4 +1,3 @@
-
 .app-layout {
   min-height: 100vh;
   display: flex;
@@ -211,6 +210,11 @@
   cursor: not-allowed;
 }
 
+.add-task-button:focus-visible {
+  outline: 2px solid #00d2ff;
+  outline-offset: 3px;
+}
+
 /* Task board */
 .task-board {
   display: grid;
@@ -394,6 +398,48 @@
   color: #102b45;
 }
 
+/*======================================================*/
+.task-description {
+  margin: 8px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.task-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.task-card-actions button {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.task-edit-button {
+  color: var(--text);
+}
+
+.task-delete-button {
+  color: #dc5145;
+}
+
+.task-card-actions button:hover {
+  background: var(--background);
+}
+
+.task-card-actions button:focus-visible {
+  outline: 2px solid #2876bd;
+  outline-offset: 2px;
+}
+
+/*=================================*/
 /* Tablet */
 @media (max-width: 1000px) {
   .sidebar {
@@ -515,6 +561,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -526,6 +573,7 @@
 }
 
 @media (max-width: 650px) {
+
   html,
   body,
   #root {

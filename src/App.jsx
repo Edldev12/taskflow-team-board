@@ -1,8 +1,9 @@
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Header from "./components/Header";
 import TaskColumn from "./components/TaskColumn";
 import "./App.css";
+import TaskModal from "./components/TaskModal";
 
 const taskColumns = [
   {
@@ -40,11 +41,78 @@ const taskColumns = [
 
 function App() {
   const [theme, setTheme] = useState("light");
-
+  const [columns, setColumns] = useState(taskColumns);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const triggerRef = useRef(null);
+  const returnFocusRef = useRef(null);
+  const [selectedTask, setSelectedTask] = useState(null);
   function toggleTheme(selectedTheme) {
     setTheme(selectedTheme);
   }
+  function openCreateModal() {
+    returnFocusRef.current = triggerRef.current;
+    setSelectedTask(null);
+    setIsModalOpen(true);
+  }
 
+  function openEditModal(task, triggerElement) {
+    returnFocusRef.current = triggerElement;
+    setSelectedTask(task);
+    setIsModalOpen(true);
+  }
+
+  function closeModal() {
+    setIsModalOpen(false);
+    setSelectedTask(null);
+  }
+
+  function saveTask(taskData) {
+    if (selectedTask) {
+      // Update existing task
+      setColumns((previousColumns) =>
+        previousColumns.map((column) => ({
+          ...column,
+          tasks: column.tasks.map((task) =>
+            task.id === selectedTask.id
+              ? { ...task, ...taskData }
+              : task
+          ),
+        }))
+      );
+    } else {
+      // Create new task in To Do
+      const newTask = {
+        id: crypto.randomUUID(),
+        ...taskData,
+        status: "todo",
+      };
+
+      setColumns((previousColumns) =>
+        previousColumns.map((column) =>
+          column.id === "todo"
+            ? { ...column, tasks: [...column.tasks, newTask] }
+            : column
+        )
+      );
+    }
+
+    closeModal();
+  }
+
+  function deleteTask(taskId) {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this task?"
+    );
+
+    if (!confirmed) return;
+
+    setColumns((previousColumns) =>
+      previousColumns.map((column) => ({
+        ...column,
+        tasks: column.tasks.filter((task) => task.id !== taskId),
+      }))
+    );
+  }
   return (
     <div className="app-layout" data-theme={theme}>
       <aside className="sidebar">
@@ -131,17 +199,48 @@ function App() {
               <p>Organize your work and stay on track.</p>
             </div>
 
+            {/*
             <button className="add-task-button" disabled>
+              <span>+</span> Add Task
+            </button>
+            */}
+            <button
+              ref={triggerRef}
+              className="add-task-button"
+              onClick={openCreateModal}
+              type="button"
+            >
               <span>+</span> Add Task
             </button>
           </div>
 
+          {/*
           <div className="task-board">
             {taskColumns.map((column) => (
               <TaskColumn key={column.id} column={column} />
             ))}
           </div>
+          */}
+          <div className="task-board">
+            {columns.map((column) => (
+              <TaskColumn
+                key={column.id}
+                column={column}
+                onEdit={openEditModal}
+                onDelete={deleteTask}
+              />
+            ))}
+          </div>
         </section>
+        {isModalOpen && (
+          <TaskModal
+            isOpen={isModalOpen}
+            onClose={closeModal}
+            onSave={saveTask}
+            task={selectedTask}
+            returnFocusRef={returnFocusRef}
+          />
+        )}
       </main>
     </div>
   );

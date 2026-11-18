@@ -1,7 +1,8 @@
 
 import TaskCard from "./TaskCard";
 
-function TaskColumn({ column }) {
+//function TaskColumn({ column }) {
+function TaskColumn({ column, onEdit, onDelete }) {
   return (
     <section className="task-column">
       <div className="column-heading">
@@ -15,7 +16,12 @@ function TaskColumn({ column }) {
 
       <div className="column-tasks">
         {column.tasks.map((task) => (
-          <TaskCard key={task.id} task={task} />
+          <TaskCard
+            key={task.id}
+            task={task}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
         ))}
       </div>
     </section>
