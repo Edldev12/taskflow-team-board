@@ -1,8 +1,38 @@
 
-//function TaskCard({ task }) {
-function TaskCard({ task, onEdit, onDelete }) {
+function TaskCard({
+  task,
+  columnTitle,
+  onEdit,
+  onDelete,
+  isDragging,
+  isKeyboardMoving,
+  dropPosition,
+  cardRef,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
+  onKeyDown,
+}) {
   return (
-    <article className="task-card">
+    <article
+      ref={cardRef}
+      className={`task-card${isDragging ? " is-dragging" : ""}${
+        isKeyboardMoving ? " is-keyboard-moving" : ""
+      }${
+        dropPosition ? ` drop-${dropPosition}` : ""
+      }`}
+      tabIndex={0}
+      aria-label={`${task.title}, ${columnTitle}. Press Enter or Space to move.`}
+      aria-describedby="task-keyboard-help"
+      aria-keyshortcuts="Enter Space ArrowUp ArrowDown ArrowLeft ArrowRight Escape"
+      draggable="true"
+      onDragStart={(event) => onDragStart(task.id, event)}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onKeyDown={onKeyDown}
+    >
       <h3>{task.title}</h3>
       {task.description && (
         <p className="task-description">{task.description}</p>
