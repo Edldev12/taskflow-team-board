@@ -39,6 +39,65 @@ const taskColumns = [
   },
 ];
 
+const TASK_COLUMNS_STORAGE_KEY = "taskflow-team-board.columns";
+
+function loadTaskColumns() {
+  try {
+    const savedColumns = window.localStorage.getItem(TASK_COLUMNS_STORAGE_KEY);
+    if (savedColumns === null) {
+      return taskColumns;
+    }
+
+    const parsedColumns = JSON.parse(savedColumns);
+    if (!Array.isArray(parsedColumns)) {
+      throw new Error("Saved task columns are not a list.");
+    }
+
+    const restoredColumns = taskColumns.map((column) => {
+      const savedColumn = parsedColumns.find(
+        (item) => item?.id === column.id
+      );
+
+      if (!savedColumn || !Array.isArray(savedColumn.tasks)) {
+        throw new Error(`Saved tasks for "${column.id}" are invalid.`);
+      }
+
+      return {
+        ...column,
+        tasks: savedColumn.tasks.map((task) => {
+          if (
+            !task ||
+            (typeof task.id !== "string" && typeof task.id !== "number") ||
+            typeof task.title !== "string" ||
+            typeof task.label !== "string" ||
+            typeof task.priority !== "string"
+          ) {
+            throw new Error(`A saved task in "${column.id}" is invalid.`);
+          }
+
+          return { ...task, status: column.id };
+        }),
+      };
+    });
+
+    const taskIds = new Set();
+    for (const column of restoredColumns) {
+      for (const task of column.tasks) {
+        const taskId = String(task.id);
+        if (taskIds.has(taskId)) {
+          throw new Error(`Saved task ID "${taskId}" appears more than once.`);
+        }
+        taskIds.add(taskId);
+      }
+    }
+
+    return restoredColumns;
+  } catch (error) {
+    console.error("Unable to restore the saved task board.", error);
+    return taskColumns;
+  }
+}
+
 function moveTaskToPosition(previousColumns, taskId, destinationColumnId, insertionIndex) {
   const sourceColumnIndex = previousColumns.findIndex((column) =>
     column.tasks.some((task) => String(task.id) === String(taskId))
@@ -102,7 +161,7 @@ function moveTaskToPosition(previousColumns, taskId, destinationColumnId, insert
 
 function App() {
   const [theme, setTheme] = useState("light");
-  const [columns, setColumns] = useState(taskColumns);
+  const [columns, setColumns] = useState(loadTaskColumns);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dropTargetColumnId, setDropTargetColumnId] = useState(null);
@@ -114,6 +173,17 @@ function App() {
   const taskCardRefs = useRef(new Map());
   const pendingKeyboardFocusTaskId = useRef(null);
   const [selectedTask, setSelectedTask] = useState(null);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        TASK_COLUMNS_STORAGE_KEY,
+        JSON.stringify(columns)
+      );
+    } catch (error) {
+      console.error("Unable to save the task board.", error);
+    }
+  }, [columns]);
 
   useEffect(() => {
     if (pendingKeyboardFocusTaskId.current === null) return;
