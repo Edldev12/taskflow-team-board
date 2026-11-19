@@ -1,5 +1,5 @@
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Header from "./components/Header";
 import TaskColumn from "./components/TaskColumn";
 import "./App.css";
@@ -39,6 +39,67 @@ const taskColumns = [
   },
 ];
 
+function moveTaskToPosition(previousColumns, taskId, destinationColumnId, insertionIndex) {
+  const sourceColumnIndex = previousColumns.findIndex((column) =>
+    column.tasks.some((task) => String(task.id) === String(taskId))
+  );
+  const destinationColumnIndex = previousColumns.findIndex(
+    (column) => column.id === destinationColumnId
+  );
+
+  if (sourceColumnIndex === -1 || destinationColumnIndex === -1) {
+    return previousColumns;
+  }
+
+  const sourceColumn = previousColumns[sourceColumnIndex];
+  const task = sourceColumn.tasks.find(
+    (item) => String(item.id) === String(taskId)
+  );
+  const sourceTasks = sourceColumn.tasks.filter(
+    (item) => String(item.id) !== String(taskId)
+  );
+
+  if (sourceColumnIndex === destinationColumnIndex) {
+    const position = Math.max(0, Math.min(insertionIndex, sourceTasks.length));
+    const reorderedTasks = [...sourceTasks];
+    reorderedTasks.splice(position, 0, task);
+
+    if (
+      reorderedTasks.every(
+        (item, index) => item.id === sourceColumn.tasks[index].id
+      )
+    ) {
+      return previousColumns;
+    }
+
+    return previousColumns.map((column, index) =>
+      index === sourceColumnIndex
+        ? { ...column, tasks: reorderedTasks }
+        : column
+    );
+  }
+
+  const destinationColumn = previousColumns[destinationColumnIndex];
+  const destinationTasks = [...destinationColumn.tasks];
+  const position = Math.max(0, Math.min(insertionIndex, destinationTasks.length));
+  destinationTasks.splice(position, 0, {
+    ...task,
+    status: destinationColumn.id,
+  });
+
+  return previousColumns.map((column, index) => {
+    if (index === sourceColumnIndex) {
+      return { ...column, tasks: sourceTasks };
+    }
+
+    if (index === destinationColumnIndex) {
+      return { ...column, tasks: destinationTasks };
+    }
+
+    return column;
+  });
+}
+
 function App() {
   const [theme, setTheme] = useState("light");
   const [columns, setColumns] = useState(taskColumns);
@@ -46,9 +107,22 @@ function App() {
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dropTargetColumnId, setDropTargetColumnId] = useState(null);
   const [dropIndicator, setDropIndicator] = useState(null);
+  const [keyboardMove, setKeyboardMove] = useState(null);
+  const [keyboardAnnouncement, setKeyboardAnnouncement] = useState("");
   const triggerRef = useRef(null);
   const returnFocusRef = useRef(null);
+  const taskCardRefs = useRef(new Map());
+  const pendingKeyboardFocusTaskId = useRef(null);
   const [selectedTask, setSelectedTask] = useState(null);
+
+  useEffect(() => {
+    if (pendingKeyboardFocusTaskId.current === null) return;
+
+    const taskId = String(pendingKeyboardFocusTaskId.current);
+    pendingKeyboardFocusTaskId.current = null;
+    taskCardRefs.current.get(taskId)?.focus();
+  }, [columns]);
+
   function toggleTheme(selectedTheme) {
     setTheme(selectedTheme);
   }
@@ -121,6 +195,7 @@ function App() {
     event.dataTransfer.setData("text/plain", String(taskId));
     event.dataTransfer.effectAllowed = "move";
     setDraggedTaskId(taskId);
+    setKeyboardMove(null);
   }
 
   function handleColumnDragOver(columnId, event) {
@@ -183,37 +258,11 @@ function App() {
           return previousColumns;
         }
 
-        const sourceColumn = previousColumns[sourceColumnIndex];
-        const taskIndex = sourceColumn.tasks.findIndex(
-          (task) => String(task.id) === taskId
+        const destinationTasks = previousColumns[destinationColumnIndex].tasks.filter(
+          (task) =>
+            sourceColumnIndex !== destinationColumnIndex ||
+            String(task.id) !== taskId
         );
-        if (taskIndex === -1) return previousColumns;
-
-        if (sourceColumnIndex === destinationColumnIndex) {
-          const reorderedTasks = [...sourceColumn.tasks];
-          const [task] = reorderedTasks.splice(taskIndex, 1);
-          const targetIndex = targetTaskId === null
-            ? reorderedTasks.length
-            : reorderedTasks.findIndex(
-              (item) => String(item.id) === String(targetTaskId)
-            );
-
-          if (targetIndex === -1) return previousColumns;
-
-          const insertionIndex =
-            targetIndex + (targetPosition === "after" ? 1 : 0);
-          reorderedTasks.splice(insertionIndex, 0, task);
-
-          return previousColumns.map((column, index) =>
-            index === sourceColumnIndex
-              ? { ...column, tasks: reorderedTasks }
-              : column
-          );
-        }
-
-        const task = sourceColumn.tasks[taskIndex];
-        const destinationColumn = previousColumns[destinationColumnIndex];
-        const destinationTasks = [...destinationColumn.tasks];
         const targetIndex = targetTaskId === null
           ? destinationTasks.length
           : destinationTasks.findIndex(
@@ -222,32 +271,153 @@ function App() {
 
         if (targetIndex === -1) return previousColumns;
 
-        const insertionIndex = targetIndex + (targetPosition === "after" ? 1 : 0);
-        destinationTasks.splice(insertionIndex, 0, {
-          ...task,
-          status: destinationColumn.id,
-        });
-
-        return previousColumns.map((column, index) => {
-          if (index === sourceColumnIndex) {
-            return {
-              ...column,
-              tasks: column.tasks.filter((item) => String(item.id) !== taskId),
-            };
-          }
-
-          if (index === destinationColumnIndex) {
-            return { ...column, tasks: destinationTasks };
-          }
-
-          return column;
-        });
+        return moveTaskToPosition(
+          previousColumns,
+          taskId,
+          columnId,
+          targetIndex + (targetPosition === "after" ? 1 : 0)
+        );
       });
     }
 
     setDraggedTaskId(null);
     setDropTargetColumnId(null);
     setDropIndicator(null);
+  }
+
+  function getKeyboardMoveAnnouncement(move, prefix = "Moving") {
+    const column = columns.find((item) => item.id === move.columnId);
+    if (!column) return "";
+
+    const task = columns
+      .flatMap((item) => item.tasks)
+      .find((item) => String(item.id) === String(move.taskId));
+    const totalTasks =
+      column.tasks.length +
+      (move.columnId === move.sourceColumnId ? 0 : 1);
+
+    return `${prefix} ${task?.title || "task"} to ${column.title}, position ${
+      move.index + 1
+    } of ${totalTasks}. Use the arrow keys to choose a position, Enter or Space to drop, or Escape to cancel.`;
+  }
+
+  function handleTaskKeyDown(taskId, event) {
+    if (event.target !== event.currentTarget) return;
+
+    const activeMove =
+      keyboardMove &&
+      String(keyboardMove.taskId) === String(taskId);
+
+    if (event.key === "Tab" && activeMove) {
+      setKeyboardMove(null);
+      setKeyboardAnnouncement("Keyboard task movement canceled.");
+      return;
+    }
+
+    if (
+      (event.key === "Enter" || event.key === " ") &&
+      (!keyboardMove || activeMove)
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (!keyboardMove) {
+        const sourceColumnIndex = columns.findIndex((column) =>
+          column.tasks.some((task) => String(task.id) === String(taskId))
+        );
+        if (sourceColumnIndex === -1) return;
+
+        const sourceColumn = columns[sourceColumnIndex];
+        const sourceIndex = sourceColumn.tasks.findIndex(
+          (task) => String(task.id) === String(taskId)
+        );
+        const move = {
+          taskId,
+          sourceColumnId: sourceColumn.id,
+          columnId: sourceColumn.id,
+          index: sourceIndex,
+        };
+        setKeyboardMove(move);
+        setKeyboardAnnouncement(
+          getKeyboardMoveAnnouncement(move, "Picked up")
+        );
+        return;
+      }
+
+      pendingKeyboardFocusTaskId.current = keyboardMove.taskId;
+      setColumns((previousColumns) =>
+        moveTaskToPosition(
+          previousColumns,
+          keyboardMove.taskId,
+          keyboardMove.columnId,
+          keyboardMove.index
+        )
+      );
+      setKeyboardAnnouncement(
+        getKeyboardMoveAnnouncement(keyboardMove, "Moved")
+      );
+      setKeyboardMove(null);
+      return;
+    }
+
+    if (event.key === "Escape" && activeMove) {
+      event.preventDefault();
+      event.stopPropagation();
+      setKeyboardMove(null);
+      setKeyboardAnnouncement("Keyboard task movement canceled.");
+      return;
+    }
+
+    if (!activeMove) return;
+
+    if (
+      event.key !== "ArrowUp" &&
+      event.key !== "ArrowDown" &&
+      event.key !== "ArrowLeft" &&
+      event.key !== "ArrowRight"
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const currentColumnIndex = columns.findIndex(
+      (column) => column.id === keyboardMove.columnId
+    );
+    let destinationColumnIndex = currentColumnIndex;
+    let destinationIndex = keyboardMove.index;
+
+    if (event.key === "ArrowLeft") destinationColumnIndex -= 1;
+    if (event.key === "ArrowRight") destinationColumnIndex += 1;
+
+    if (destinationColumnIndex < 0 || destinationColumnIndex >= columns.length) {
+      return;
+    }
+
+    const destinationColumn = columns[destinationColumnIndex];
+    const availableSlots =
+      destinationColumn.tasks.length -
+      (destinationColumn.id === keyboardMove.sourceColumnId ? 1 : 0);
+
+    if (event.key === "ArrowUp") destinationIndex -= 1;
+    if (event.key === "ArrowDown") destinationIndex += 1;
+    destinationIndex = Math.max(0, Math.min(destinationIndex, availableSlots));
+
+    if (
+      destinationColumn.id === keyboardMove.columnId &&
+      destinationIndex === keyboardMove.index
+    ) {
+      return;
+    }
+
+    const move = {
+      ...keyboardMove,
+      columnId: destinationColumn.id,
+      index: destinationIndex,
+    };
+    setKeyboardMove(move);
+    setKeyboardAnnouncement(getKeyboardMoveAnnouncement(move));
   }
 
   function handleTaskDragEnd() {
@@ -373,12 +543,25 @@ function App() {
                 onDelete={deleteTask}
                 draggedTaskId={draggedTaskId}
                 dropIndicator={dropIndicator}
-                isDropTarget={dropTargetColumnId === column.id}
+                keyboardMove={keyboardMove}
+                isDropTarget={
+                  dropTargetColumnId === column.id ||
+                  keyboardMove?.columnId === column.id
+                }
                 onTaskDragStart={handleTaskDragStart}
                 onTaskDragEnd={handleTaskDragEnd}
                 onTaskDragOver={(taskId, event) =>
                   handleTaskDragOver(column.id, taskId, event)
                 }
+                onTaskKeyDown={handleTaskKeyDown}
+                onTaskCardRef={(taskId, element) => {
+                  const key = String(taskId);
+                  if (element) {
+                    taskCardRefs.current.set(key, element);
+                  } else {
+                    taskCardRefs.current.delete(key);
+                  }
+                }}
                 onColumnDragOver={(event) => handleColumnDragOver(column.id, event)}
                 onColumnDragLeave={(event) => handleColumnDragLeave(column.id, event)}
                 onTaskDrop={(event, targetTaskId) =>
@@ -386,6 +569,14 @@ function App() {
                 }
               />
             ))}
+          </div>
+          <p id="task-keyboard-help" className="visually-hidden">
+            Press Enter or Space on a task to pick it up. Use the arrow keys to
+            choose a column and position, then press Enter or Space to drop.
+            Press Escape to cancel. Tab cancels movement and continues navigation.
+          </p>
+          <div className="visually-hidden" role="status" aria-live="polite" aria-atomic="true">
+            {keyboardAnnouncement}
           </div>
         </section>
         {isModalOpen && (

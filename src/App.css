@@ -292,6 +292,15 @@
   gap: 11px;
 }
 
+.keyboard-drop-indicator {
+  flex: none;
+  height: 3px;
+  margin: 4px 0;
+  border-radius: 3px;
+  background: #2876bd;
+  box-shadow: 0 0 0 2px rgba(40, 118, 189, 0.18);
+}
+
 /* Task cards */
 .task-card {
   position: relative;
@@ -309,9 +318,20 @@
   cursor: grabbing;
 }
 
+.task-card:focus-visible {
+  outline: 3px solid #2876bd;
+  outline-offset: 3px;
+  z-index: 1;
+}
+
 .task-card.is-dragging {
   opacity: 0.45;
   transform: scale(0.98);
+}
+
+.task-card.is-keyboard-moving {
+  border-color: #2876bd;
+  box-shadow: 0 0 0 3px rgba(40, 118, 189, 0.2);
 }
 
 .task-card.drop-before::before,
@@ -481,6 +501,16 @@
 .task-card-actions button:focus-visible {
   outline: 2px solid #2876bd;
   outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /*=================================*/

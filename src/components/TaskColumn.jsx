@@ -1,4 +1,5 @@
 
+import { Fragment } from "react";
 import TaskCard from "./TaskCard";
 
 function TaskColumn({
@@ -7,14 +8,29 @@ function TaskColumn({
   onDelete,
   draggedTaskId,
   dropIndicator,
+  keyboardMove,
   isDropTarget,
   onTaskDragStart,
   onTaskDragEnd,
   onTaskDragOver,
+  onTaskKeyDown,
+  onTaskCardRef,
   onColumnDragOver,
   onColumnDragLeave,
   onTaskDrop,
 }) {
+  const isKeyboardDestination = keyboardMove?.columnId === column.id;
+  const keyboardSourceTaskIndex = column.tasks.findIndex(
+    (task) => String(task.id) === String(keyboardMove?.taskId)
+  );
+  const keyboardMarkerIndex = isKeyboardDestination
+    ? keyboardMove.index +
+      (keyboardMove.sourceColumnId === column.id &&
+      keyboardSourceTaskIndex < keyboardMove.index
+        ? 1
+        : 0)
+    : -1;
+
   return (
     <section
       className={`task-column${isDropTarget ? " is-drop-target" : ""}`}
@@ -32,25 +48,42 @@ function TaskColumn({
       </div>
 
       <div className="column-tasks">
-        {column.tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            isDragging={draggedTaskId === task.id}
-            dropPosition={
-              dropIndicator?.columnId === column.id &&
-              dropIndicator.taskId === task.id
-                ? dropIndicator.position
-                : null
-            }
-            onDragStart={onTaskDragStart}
-            onDragEnd={onTaskDragEnd}
-            onDragOver={(event) => onTaskDragOver(task.id, event)}
-            onDrop={(event) => onTaskDrop(event, task.id)}
-          />
+        {column.tasks.map((task, index) => (
+          <Fragment key={task.id}>
+            {isKeyboardDestination && keyboardMarkerIndex === index && (
+              <div className="keyboard-drop-indicator" aria-hidden="true" />
+            )}
+            <TaskCard
+              task={task}
+              columnTitle={column.title}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              isDragging={draggedTaskId === task.id}
+              isKeyboardMoving={
+                keyboardMove &&
+                String(keyboardMove.taskId) === String(task.id)
+              }
+              dropPosition={
+                dropIndicator?.columnId === column.id &&
+                dropIndicator.taskId === task.id
+                  ? dropIndicator.position
+                  : null
+              }
+              onDragStart={onTaskDragStart}
+              onDragEnd={onTaskDragEnd}
+              onDragOver={(event) => onTaskDragOver(task.id, event)}
+              onDrop={(event) => onTaskDrop(event, task.id)}
+              onKeyDown={(event) => onTaskKeyDown(task.id, event)}
+              cardRef={(element) => {
+                onTaskCardRef(task.id, element);
+              }}
+            />
+          </Fragment>
         ))}
+        {isKeyboardDestination &&
+          keyboardMarkerIndex === column.tasks.length && (
+            <div className="keyboard-drop-indicator" aria-hidden="true" />
+          )}
       </div>
     </section>
   );
