@@ -294,6 +294,7 @@
 
 /* Task cards */
 .task-card {
+  position: relative;
   min-width: 0;
   padding: 15px;
   background: var(--surface);
@@ -311,6 +312,26 @@
 .task-card.is-dragging {
   opacity: 0.45;
   transform: scale(0.98);
+}
+
+.task-card.drop-before::before,
+.task-card.drop-after::after {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 3px;
+  background: #2876bd;
+  box-shadow: 0 0 0 2px rgba(40, 118, 189, 0.18);
+  content: "";
+}
+
+.task-card.drop-before::before {
+  top: -7px;
+}
+
+.task-card.drop-after::after {
+  bottom: -7px;
 }
 
 .task-card h3 {

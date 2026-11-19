@@ -45,6 +45,7 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dropTargetColumnId, setDropTargetColumnId] = useState(null);
+  const [dropIndicator, setDropIndicator] = useState(null);
   const triggerRef = useRef(null);
   const returnFocusRef = useRef(null);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -133,12 +134,41 @@ function App() {
       setDropTargetColumnId((currentColumnId) =>
         currentColumnId === columnId ? null : currentColumnId
       );
+      setDropIndicator((currentIndicator) =>
+        currentIndicator?.columnId === columnId ? null : currentIndicator
+      );
     }
   }
 
-  function handleTaskDrop(columnId, event) {
+  function handleTaskDragOver(columnId, targetTaskId, event) {
     event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDropTargetColumnId(columnId);
+
+    if (String(draggedTaskId) === String(targetTaskId)) {
+      setDropIndicator(null);
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    setDropIndicator({
+      columnId,
+      taskId: targetTaskId,
+      position: event.clientY < bounds.top + bounds.height / 2 ? "before" : "after",
+    });
+  }
+
+  function handleTaskDrop(columnId, event, targetTaskId = null) {
+    event.preventDefault();
+    event.stopPropagation();
     const taskId = event.dataTransfer.getData("text/plain");
+    let targetPosition = null;
+
+    if (targetTaskId !== null) {
+      const bounds = event.currentTarget.getBoundingClientRect();
+      targetPosition =
+        event.clientY < bounds.top + bounds.height / 2 ? "before" : "after";
+    }
 
     if (taskId) {
       setColumns((previousColumns) => {
@@ -149,17 +179,54 @@ function App() {
           (column) => column.id === columnId
         );
 
-        if (
-          sourceColumnIndex === -1 ||
-          destinationColumnIndex === -1 ||
-          sourceColumnIndex === destinationColumnIndex
-        ) {
+        if (sourceColumnIndex === -1 || destinationColumnIndex === -1) {
           return previousColumns;
         }
 
-        const task = previousColumns[sourceColumnIndex].tasks.find(
-          (item) => String(item.id) === taskId
+        const sourceColumn = previousColumns[sourceColumnIndex];
+        const taskIndex = sourceColumn.tasks.findIndex(
+          (task) => String(task.id) === taskId
         );
+        if (taskIndex === -1) return previousColumns;
+
+        if (sourceColumnIndex === destinationColumnIndex) {
+          const reorderedTasks = [...sourceColumn.tasks];
+          const [task] = reorderedTasks.splice(taskIndex, 1);
+          const targetIndex = targetTaskId === null
+            ? reorderedTasks.length
+            : reorderedTasks.findIndex(
+              (item) => String(item.id) === String(targetTaskId)
+            );
+
+          if (targetIndex === -1) return previousColumns;
+
+          const insertionIndex =
+            targetIndex + (targetPosition === "after" ? 1 : 0);
+          reorderedTasks.splice(insertionIndex, 0, task);
+
+          return previousColumns.map((column, index) =>
+            index === sourceColumnIndex
+              ? { ...column, tasks: reorderedTasks }
+              : column
+          );
+        }
+
+        const task = sourceColumn.tasks[taskIndex];
+        const destinationColumn = previousColumns[destinationColumnIndex];
+        const destinationTasks = [...destinationColumn.tasks];
+        const targetIndex = targetTaskId === null
+          ? destinationTasks.length
+          : destinationTasks.findIndex(
+            (item) => String(item.id) === String(targetTaskId)
+          );
+
+        if (targetIndex === -1) return previousColumns;
+
+        const insertionIndex = targetIndex + (targetPosition === "after" ? 1 : 0);
+        destinationTasks.splice(insertionIndex, 0, {
+          ...task,
+          status: destinationColumn.id,
+        });
 
         return previousColumns.map((column, index) => {
           if (index === sourceColumnIndex) {
@@ -170,10 +237,7 @@ function App() {
           }
 
           if (index === destinationColumnIndex) {
-            return {
-              ...column,
-              tasks: [...column.tasks, { ...task, status: column.id }],
-            };
+            return { ...column, tasks: destinationTasks };
           }
 
           return column;
@@ -183,6 +247,13 @@ function App() {
 
     setDraggedTaskId(null);
     setDropTargetColumnId(null);
+    setDropIndicator(null);
+  }
+
+  function handleTaskDragEnd() {
+    setDraggedTaskId(null);
+    setDropTargetColumnId(null);
+    setDropIndicator(null);
   }
 
   return (
@@ -301,15 +372,18 @@ function App() {
                 onEdit={openEditModal}
                 onDelete={deleteTask}
                 draggedTaskId={draggedTaskId}
+                dropIndicator={dropIndicator}
                 isDropTarget={dropTargetColumnId === column.id}
                 onTaskDragStart={handleTaskDragStart}
-                onTaskDragEnd={() => {
-                  setDraggedTaskId(null);
-                  setDropTargetColumnId(null);
-                }}
+                onTaskDragEnd={handleTaskDragEnd}
+                onTaskDragOver={(taskId, event) =>
+                  handleTaskDragOver(column.id, taskId, event)
+                }
                 onColumnDragOver={(event) => handleColumnDragOver(column.id, event)}
                 onColumnDragLeave={(event) => handleColumnDragLeave(column.id, event)}
-                onTaskDrop={(event) => handleTaskDrop(column.id, event)}
+                onTaskDrop={(event, targetTaskId) =>
+                  handleTaskDrop(column.id, event, targetTaskId)
+                }
               />
             ))}
           </div>

@@ -6,9 +6,11 @@ function TaskColumn({
   onEdit,
   onDelete,
   draggedTaskId,
+  dropIndicator,
   isDropTarget,
   onTaskDragStart,
   onTaskDragEnd,
+  onTaskDragOver,
   onColumnDragOver,
   onColumnDragLeave,
   onTaskDrop,
@@ -37,8 +39,16 @@ function TaskColumn({
             onEdit={onEdit}
             onDelete={onDelete}
             isDragging={draggedTaskId === task.id}
+            dropPosition={
+              dropIndicator?.columnId === column.id &&
+              dropIndicator.taskId === task.id
+                ? dropIndicator.position
+                : null
+            }
             onDragStart={onTaskDragStart}
             onDragEnd={onTaskDragEnd}
+            onDragOver={(event) => onTaskDragOver(task.id, event)}
+            onDrop={(event) => onTaskDrop(event, task.id)}
           />
         ))}
       </div>

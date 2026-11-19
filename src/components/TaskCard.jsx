@@ -1,11 +1,25 @@
 
-function TaskCard({ task, onEdit, onDelete, isDragging, onDragStart, onDragEnd }) {
+function TaskCard({
+  task,
+  onEdit,
+  onDelete,
+  isDragging,
+  dropPosition,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
+}) {
   return (
     <article
-      className={`task-card${isDragging ? " is-dragging" : ""}`}
+      className={`task-card${isDragging ? " is-dragging" : ""}${
+        dropPosition ? ` drop-${dropPosition}` : ""
+      }`}
       draggable="true"
       onDragStart={(event) => onDragStart(task.id, event)}
       onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
     >
       <h3>{task.title}</h3>
       {task.description && (
