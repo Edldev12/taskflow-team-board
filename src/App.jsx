@@ -11,10 +11,10 @@ const taskColumns = [
     title: "To Do",
     color: "blue",
     tasks: [
-      { id: 1, title: "Design landing page", label: "Design", priority: "High" },
-      { id: 2, title: "Review project requirements", label: "Planning", priority: "Medium" },
-      { id: 3, title: "Create navigation layout", label: "Frontend", priority: "Low" },
-      { id: 8, title: "Prepare project documentation", label: "Planning", priority: "Medium" },
+      { id: 1, title: "Design landing page", label: "Design", priority: "High", status: "todo" },
+      { id: 2, title: "Review project requirements", label: "Planning", priority: "Medium", status: "todo" },
+      { id: 3, title: "Create navigation layout", label: "Frontend", priority: "Low", status: "todo" },
+      { id: 8, title: "Prepare project documentation", label: "Planning", priority: "Medium", status: "todo" },
     ],
   },
   {
@@ -22,9 +22,9 @@ const taskColumns = [
     title: "In Progress",
     color: "orange",
     tasks: [
-      { id: 4, title: "Build dashboard interface", label: "Frontend", priority: "High" },
-      { id: 5, title: "Implement responsive layout", label: "Design", priority: "Medium" },
-      { id: 9, title: "Develop task components", label: "Frontend", priority: "High" },
+      { id: 4, title: "Build dashboard interface", label: "Frontend", priority: "High", status: "in-progress" },
+      { id: 5, title: "Implement responsive layout", label: "Design", priority: "Medium", status: "in-progress" },
+      { id: 9, title: "Develop task components", label: "Frontend", priority: "High", status: "in-progress" },
     ],
   },
   {
@@ -32,9 +32,9 @@ const taskColumns = [
     title: "Done",
     color: "green",
     tasks: [
-      { id: 6, title: "Set up React project", label: "Development", priority: "High" },
-      { id: 7, title: "Create project structure", label: "Planning", priority: "Low" },
-      { id: 10, title: "Configure Vite", label: "Development", priority: "Medium" },
+      { id: 6, title: "Set up React project", label: "Development", priority: "High", status: "done" },
+      { id: 7, title: "Create project structure", label: "Planning", priority: "Low", status: "done" },
+      { id: 10, title: "Configure Vite", label: "Development", priority: "Medium", status: "done" },
     ],
   },
 ];
