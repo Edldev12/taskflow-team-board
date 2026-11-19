@@ -159,6 +159,36 @@ function moveTaskToPosition(previousColumns, taskId, destinationColumnId, insert
   });
 }
 
+function getTaskMovementAnnouncement(previousColumns, nextColumns, taskId) {
+  const sourceColumn = previousColumns.find((column) =>
+    column.tasks.some((task) => String(task.id) === String(taskId))
+  );
+  const destinationColumn = nextColumns.find((column) =>
+    column.tasks.some((task) => String(task.id) === String(taskId))
+  );
+
+  if (!sourceColumn || !destinationColumn) return "";
+
+  const task = sourceColumn.tasks.find(
+    (item) => String(item.id) === String(taskId)
+  );
+
+  if (sourceColumn.id !== destinationColumn.id) {
+    return `${task.title} moved from ${sourceColumn.title} to ${destinationColumn.title}.`;
+  }
+
+  const previousPosition = sourceColumn.tasks.findIndex(
+    (item) => String(item.id) === String(taskId)
+  );
+  const newPosition = destinationColumn.tasks.findIndex(
+    (item) => String(item.id) === String(taskId)
+  );
+
+  if (previousPosition === newPosition) return "";
+
+  return `${task.title} moved to position ${newPosition + 1} in ${destinationColumn.title}.`;
+}
+
 function App() {
   const [theme, setTheme] = useState("light");
   const [columns, setColumns] = useState(loadTaskColumns);
@@ -167,12 +197,23 @@ function App() {
   const [dropTargetColumnId, setDropTargetColumnId] = useState(null);
   const [dropIndicator, setDropIndicator] = useState(null);
   const [keyboardMove, setKeyboardMove] = useState(null);
-  const [keyboardAnnouncement, setKeyboardAnnouncement] = useState("");
+  const [taskAnnouncement, setTaskAnnouncement] = useState("");
   const triggerRef = useRef(null);
   const returnFocusRef = useRef(null);
   const taskCardRefs = useRef(new Map());
   const pendingKeyboardFocusTaskId = useRef(null);
+  const lastTaskAnnouncementRef = useRef(null);
   const [selectedTask, setSelectedTask] = useState(null);
+
+  useEffect(() => {
+    if (!taskAnnouncement) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setTaskAnnouncement("");
+    }, 5000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [taskAnnouncement]);
 
   useEffect(() => {
     try {
@@ -196,6 +237,29 @@ function App() {
   function toggleTheme(selectedTheme) {
     setTheme(selectedTheme);
   }
+
+  function announceTaskMovement(previousColumns, nextColumns, taskId) {
+    const message = getTaskMovementAnnouncement(
+      previousColumns,
+      nextColumns,
+      taskId
+    );
+
+    if (
+      !message ||
+      (message === lastTaskAnnouncementRef.current?.message &&
+        String(taskId) === lastTaskAnnouncementRef.current?.taskId)
+    ) {
+      return;
+    }
+
+    lastTaskAnnouncementRef.current = {
+      taskId: String(taskId),
+      message,
+    };
+    setTaskAnnouncement(message);
+  }
+
   function openCreateModal() {
     returnFocusRef.current = triggerRef.current;
     setSelectedTask(null);
@@ -316,19 +380,15 @@ function App() {
     }
 
     if (taskId) {
-      setColumns((previousColumns) => {
-        const sourceColumnIndex = previousColumns.findIndex((column) =>
-          column.tasks.some((task) => String(task.id) === taskId)
-        );
-        const destinationColumnIndex = previousColumns.findIndex(
-          (column) => column.id === columnId
-        );
+      const sourceColumnIndex = columns.findIndex((column) =>
+        column.tasks.some((task) => String(task.id) === taskId)
+      );
+      const destinationColumnIndex = columns.findIndex(
+        (column) => column.id === columnId
+      );
 
-        if (sourceColumnIndex === -1 || destinationColumnIndex === -1) {
-          return previousColumns;
-        }
-
-        const destinationTasks = previousColumns[destinationColumnIndex].tasks.filter(
+      if (sourceColumnIndex !== -1 && destinationColumnIndex !== -1) {
+        const destinationTasks = columns[destinationColumnIndex].tasks.filter(
           (task) =>
             sourceColumnIndex !== destinationColumnIndex ||
             String(task.id) !== taskId
@@ -339,36 +399,25 @@ function App() {
             (item) => String(item.id) === String(targetTaskId)
           );
 
-        if (targetIndex === -1) return previousColumns;
+        if (targetIndex !== -1) {
+          const nextColumns = moveTaskToPosition(
+            columns,
+            taskId,
+            columnId,
+            targetIndex + (targetPosition === "after" ? 1 : 0)
+          );
 
-        return moveTaskToPosition(
-          previousColumns,
-          taskId,
-          columnId,
-          targetIndex + (targetPosition === "after" ? 1 : 0)
-        );
-      });
+          if (nextColumns !== columns) {
+            setColumns(nextColumns);
+            announceTaskMovement(columns, nextColumns, taskId);
+          }
+        }
+      }
     }
 
     setDraggedTaskId(null);
     setDropTargetColumnId(null);
     setDropIndicator(null);
-  }
-
-  function getKeyboardMoveAnnouncement(move, prefix = "Moving") {
-    const column = columns.find((item) => item.id === move.columnId);
-    if (!column) return "";
-
-    const task = columns
-      .flatMap((item) => item.tasks)
-      .find((item) => String(item.id) === String(move.taskId));
-    const totalTasks =
-      column.tasks.length +
-      (move.columnId === move.sourceColumnId ? 0 : 1);
-
-    return `${prefix} ${task?.title || "task"} to ${column.title}, position ${
-      move.index + 1
-    } of ${totalTasks}. Use the arrow keys to choose a position, Enter or Space to drop, or Escape to cancel.`;
   }
 
   function handleTaskKeyDown(taskId, event) {
@@ -380,7 +429,6 @@ function App() {
 
     if (event.key === "Tab" && activeMove) {
       setKeyboardMove(null);
-      setKeyboardAnnouncement("Keyboard task movement canceled.");
       return;
     }
 
@@ -408,24 +456,22 @@ function App() {
           index: sourceIndex,
         };
         setKeyboardMove(move);
-        setKeyboardAnnouncement(
-          getKeyboardMoveAnnouncement(move, "Picked up")
-        );
         return;
       }
 
-      pendingKeyboardFocusTaskId.current = keyboardMove.taskId;
-      setColumns((previousColumns) =>
-        moveTaskToPosition(
-          previousColumns,
-          keyboardMove.taskId,
-          keyboardMove.columnId,
-          keyboardMove.index
-        )
+      const nextColumns = moveTaskToPosition(
+        columns,
+        keyboardMove.taskId,
+        keyboardMove.columnId,
+        keyboardMove.index
       );
-      setKeyboardAnnouncement(
-        getKeyboardMoveAnnouncement(keyboardMove, "Moved")
-      );
+
+      if (nextColumns !== columns) {
+        pendingKeyboardFocusTaskId.current = keyboardMove.taskId;
+        setColumns(nextColumns);
+        announceTaskMovement(columns, nextColumns, keyboardMove.taskId);
+      }
+
       setKeyboardMove(null);
       return;
     }
@@ -434,7 +480,6 @@ function App() {
       event.preventDefault();
       event.stopPropagation();
       setKeyboardMove(null);
-      setKeyboardAnnouncement("Keyboard task movement canceled.");
       return;
     }
 
@@ -487,7 +532,6 @@ function App() {
       index: destinationIndex,
     };
     setKeyboardMove(move);
-    setKeyboardAnnouncement(getKeyboardMoveAnnouncement(move));
   }
 
   function handleTaskDragEnd() {
@@ -645,8 +689,16 @@ function App() {
             choose a column and position, then press Enter or Space to drop.
             Press Escape to cancel. Tab cancels movement and continues navigation.
           </p>
-          <div className="visually-hidden" role="status" aria-live="polite" aria-atomic="true">
-            {keyboardAnnouncement}
+          <div
+            className={`task-movement-notification${taskAnnouncement ? " is-visible" : ""}`}
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <span className="task-movement-notification-icon" aria-hidden="true">
+              ✓
+            </span>
+            {taskAnnouncement}
           </div>
         </section>
         {isModalOpen && (
