@@ -1,8 +1,12 @@
 
-//function TaskCard({ task }) {
-function TaskCard({ task, onEdit, onDelete }) {
+function TaskCard({ task, onEdit, onDelete, isDragging, onDragStart, onDragEnd }) {
   return (
-    <article className="task-card">
+    <article
+      className={`task-card${isDragging ? " is-dragging" : ""}`}
+      draggable="true"
+      onDragStart={(event) => onDragStart(task.id, event)}
+      onDragEnd={onDragEnd}
+    >
       <h3>{task.title}</h3>
       {task.description && (
         <p className="task-description">{task.description}</p>

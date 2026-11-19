@@ -43,6 +43,8 @@ function App() {
   const [theme, setTheme] = useState("light");
   const [columns, setColumns] = useState(taskColumns);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [draggedTaskId, setDraggedTaskId] = useState(null);
+  const [dropTargetColumnId, setDropTargetColumnId] = useState(null);
   const triggerRef = useRef(null);
   const returnFocusRef = useRef(null);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -113,6 +115,76 @@ function App() {
       }))
     );
   }
+
+  function handleTaskDragStart(taskId, event) {
+    event.dataTransfer.setData("text/plain", String(taskId));
+    event.dataTransfer.effectAllowed = "move";
+    setDraggedTaskId(taskId);
+  }
+
+  function handleColumnDragOver(columnId, event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDropTargetColumnId(columnId);
+  }
+
+  function handleColumnDragLeave(columnId, event) {
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      setDropTargetColumnId((currentColumnId) =>
+        currentColumnId === columnId ? null : currentColumnId
+      );
+    }
+  }
+
+  function handleTaskDrop(columnId, event) {
+    event.preventDefault();
+    const taskId = event.dataTransfer.getData("text/plain");
+
+    if (taskId) {
+      setColumns((previousColumns) => {
+        const sourceColumnIndex = previousColumns.findIndex((column) =>
+          column.tasks.some((task) => String(task.id) === taskId)
+        );
+        const destinationColumnIndex = previousColumns.findIndex(
+          (column) => column.id === columnId
+        );
+
+        if (
+          sourceColumnIndex === -1 ||
+          destinationColumnIndex === -1 ||
+          sourceColumnIndex === destinationColumnIndex
+        ) {
+          return previousColumns;
+        }
+
+        const task = previousColumns[sourceColumnIndex].tasks.find(
+          (item) => String(item.id) === taskId
+        );
+
+        return previousColumns.map((column, index) => {
+          if (index === sourceColumnIndex) {
+            return {
+              ...column,
+              tasks: column.tasks.filter((item) => String(item.id) !== taskId),
+            };
+          }
+
+          if (index === destinationColumnIndex) {
+            return {
+              ...column,
+              tasks: [...column.tasks, { ...task, status: column.id }],
+            };
+          }
+
+          return column;
+        });
+      });
+    }
+
+    setDraggedTaskId(null);
+    setDropTargetColumnId(null);
+  }
+
   return (
     <div className="app-layout" data-theme={theme}>
       <aside className="sidebar">
@@ -228,6 +300,16 @@ function App() {
                 column={column}
                 onEdit={openEditModal}
                 onDelete={deleteTask}
+                draggedTaskId={draggedTaskId}
+                isDropTarget={dropTargetColumnId === column.id}
+                onTaskDragStart={handleTaskDragStart}
+                onTaskDragEnd={() => {
+                  setDraggedTaskId(null);
+                  setDropTargetColumnId(null);
+                }}
+                onColumnDragOver={(event) => handleColumnDragOver(column.id, event)}
+                onColumnDragLeave={(event) => handleColumnDragLeave(column.id, event)}
+                onTaskDrop={(event) => handleTaskDrop(column.id, event)}
               />
             ))}
           </div>

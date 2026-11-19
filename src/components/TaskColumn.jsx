@@ -1,10 +1,25 @@
 
 import TaskCard from "./TaskCard";
 
-//function TaskColumn({ column }) {
-function TaskColumn({ column, onEdit, onDelete }) {
+function TaskColumn({
+  column,
+  onEdit,
+  onDelete,
+  draggedTaskId,
+  isDropTarget,
+  onTaskDragStart,
+  onTaskDragEnd,
+  onColumnDragOver,
+  onColumnDragLeave,
+  onTaskDrop,
+}) {
   return (
-    <section className="task-column">
+    <section
+      className={`task-column${isDropTarget ? " is-drop-target" : ""}`}
+      onDragOver={onColumnDragOver}
+      onDragLeave={onColumnDragLeave}
+      onDrop={onTaskDrop}
+    >
       <div className="column-heading">
         <div className="column-title">
           <span className={`status-dot ${column.color}`}></span>
@@ -21,6 +36,9 @@ function TaskColumn({ column, onEdit, onDelete }) {
             task={task}
             onEdit={onEdit}
             onDelete={onDelete}
+            isDragging={draggedTaskId === task.id}
+            onDragStart={onTaskDragStart}
+            onDragEnd={onTaskDragEnd}
           />
         ))}
       </div>
