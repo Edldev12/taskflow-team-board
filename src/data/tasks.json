@@ -1,0 +1,22 @@
+[
+  {"id":1,"title":"Design landing page","description":"Create the main landing page layout.","label":"Design","priority":"High","status":"todo"},
+  {"id":2,"title":"Review project requirements","description":"Review and document project requirements.","label":"Planning","priority":"Medium","status":"todo"},
+  {"id":3,"title":"Create navigation layout","description":"Build the main navigation structure.","label":"Frontend","priority":"Low","status":"todo"},
+  {"id":4,"title":"Prepare project documentation","description":"Write the initial project documentation.","label":"Planning","priority":"Medium","status":"todo"},
+  {"id":5,"title":"Research user experience","description":"Research improvements for the user experience.","label":"Research","priority":"Low","status":"todo"},
+  {"id":6,"title":"Build dashboard interface","description":"Develop the main dashboard interface.","label":"Frontend","priority":"High","status":"in-progress"},
+  {"id":7,"title":"Implement responsive layout","description":"Make the dashboard responsive on mobile devices.","label":"Design","priority":"Medium","status":"in-progress"},
+  {"id":8,"title":"Develop task components","description":"Create reusable task components.","label":"Frontend","priority":"High","status":"in-progress"},
+  {"id":9,"title":"Implement drag and drop","description":"Allow users to move tasks between columns.","label":"Frontend","priority":"High","status":"in-progress"},
+  {"id":10,"title":"Add keyboard accessibility","description":"Support keyboard task movement.","label":"Accessibility","priority":"Medium","status":"in-progress"},
+  {"id":11,"title":"Set up React project","description":"Initialize the React application.","label":"Development","priority":"High","status":"done"},
+  {"id":12,"title":"Create project structure","description":"Organize application folders and files.","label":"Planning","priority":"Low","status":"done"},
+  {"id":13,"title":"Configure Vite","description":"Configure the Vite development environment.","label":"Development","priority":"Medium","status":"done"},
+  {"id":14,"title":"Create task card design","description":"Design reusable task cards.","label":"Design","priority":"Medium","status":"done"},
+  {"id":15,"title":"Set up GitHub repository","description":"Create and configure the team repository.","label":"Development","priority":"High","status":"done"},
+  {"id":16,"title":"Add task search","description":"Implement searching by task title.","label":"Frontend","priority":"Medium","status":"todo"},
+  {"id":17,"title":"Add task filters","description":"Filter tasks by priority and label.","label":"Frontend","priority":"Medium","status":"todo"},
+  {"id":18,"title":"Test task creation","description":"Verify that new tasks can be created.","label":"Testing","priority":"High","status":"in-progress"},
+  {"id":19,"title":"Review application performance","description":"Identify possible performance improvements.","label":"Testing","priority":"Low","status":"todo"},
+  {"id":20,"title":"Prepare final presentation","description":"Prepare the project demonstration.","label":"Planning","priority":"High","status":"done"}
+]
