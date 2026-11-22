@@ -193,7 +193,7 @@
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 14px;
   width: 100%;
-  max-width: 440px;
+  max-width: 640px;
   margin-bottom: 22px;
 }
 
@@ -236,6 +236,11 @@
 .task-stats-card--completed .task-stats-icon {
   background: #e9f7ef;
   color: #39875c;
+}
+
+.task-stats-card--pending .task-stats-icon {
+  background: #fff5e6;
+  color: #b98132;
 }
 
 .add-task-button {
@@ -481,6 +486,11 @@
 .app-layout[data-theme="dark"] .task-stats-card--completed .task-stats-icon {
   background: #304b3d;
   color: #a6e2bd;
+}
+
+.app-layout[data-theme="dark"] .task-stats-card--pending .task-stats-icon {
+  background: #514630;
+  color: #f5d28c;
 }
 
 .app-layout[data-theme="dark"] .task-column {

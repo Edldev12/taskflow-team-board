@@ -1,6 +1,6 @@
 
 import { useEffect, useRef, useState } from "react";
-import { CircleCheck, ListTodo } from "lucide-react";
+import { CircleCheck, Clock3, ListTodo } from "lucide-react";
 import Header from "./components/Header";
 import TaskColumn from "./components/TaskColumn";
 import TaskStatsCard from "./components/TaskStatsCard";
@@ -213,6 +213,13 @@ function App() {
   const completedTaskCount = columns.reduce(
     (total, column) =>
       column.id === "done" ? total + column.tasks.length : total,
+    0
+  );
+  const pendingTaskCount = columns.reduce(
+    (total, column) =>
+      column.id === "todo" || column.id === "in-progress"
+        ? total + column.tasks.length
+        : total,
     0
   );
 
@@ -663,6 +670,12 @@ function App() {
               count={completedTaskCount}
               icon={CircleCheck}
               variant="completed"
+            />
+            <TaskStatsCard
+              label="Pending Tasks"
+              count={pendingTaskCount}
+              icon={Clock3}
+              variant="pending"
             />
           </div>
 
