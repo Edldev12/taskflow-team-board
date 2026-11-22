@@ -1,0 +1,191 @@
+.help-keyboard-section {
+  padding: 22px;
+  margin-bottom: 22px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(38, 55, 74, 0.04);
+}
+
+.help-keyboard-section > .help-section-heading {
+  margin-bottom: 17px;
+}
+
+.help-keyboard-section > .help-section-heading h2 {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 19px;
+}
+
+.help-keyboard-section > .help-section-heading > p:last-child {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.keyboard-shortcuts-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.keyboard-shortcuts-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.keyboard-shortcuts-table th,
+.keyboard-shortcuts-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.keyboard-shortcuts-table thead th {
+  background: var(--background);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.keyboard-shortcuts-table th:first-child {
+  width: 25%;
+}
+
+.keyboard-shortcuts-table th:nth-child(2) {
+  width: 28%;
+}
+
+.keyboard-shortcuts-table tbody th {
+  font-weight: 650;
+}
+
+.keyboard-shortcuts-table tbody tr:last-child th,
+.keyboard-shortcuts-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.shortcut-key-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.shortcut-key-combination,
+.shortcut-key-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.shortcut-key-combination {
+  padding: 3px 5px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+}
+
+.shortcut-key-combination kbd {
+  min-width: 22px;
+  padding: 2px 5px;
+  border: 1px solid #cbd9e8;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--surface);
+  color: #2876bd;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.shortcut-key-plus {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.keyboard-shortcuts-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px;
+  margin-top: 14px;
+  border-radius: 9px;
+  background: #eaf4ff;
+  color: #315d84;
+}
+
+.keyboard-shortcuts-note svg {
+  flex: none;
+  margin-top: 1px;
+  color: #2876bd;
+}
+
+.keyboard-shortcuts-note p,
+.keyboard-search-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.keyboard-search-note {
+  padding-top: 12px;
+  color: var(--muted);
+}
+
+.app-layout[data-theme="dark"] .keyboard-shortcuts-note {
+  background: #253b52;
+  color: #c4d9ed;
+}
+
+.app-layout[data-theme="dark"] .shortcut-key-combination kbd {
+  border-color: #50647b;
+  background: #202f42;
+  color: #9bcfff;
+}
+
+@media (max-width: 650px) {
+  .help-keyboard-section {
+    padding: 16px;
+  }
+
+  .keyboard-shortcuts-table {
+    font-size: 11px;
+  }
+
+  .keyboard-shortcuts-table th,
+  .keyboard-shortcuts-table td {
+    padding: 9px 7px;
+  }
+
+  .keyboard-shortcuts-table th:first-child {
+    width: 27%;
+  }
+
+  .keyboard-shortcuts-table th:nth-child(2) {
+    width: 32%;
+  }
+
+  .shortcut-key-combination {
+    gap: 3px;
+    padding: 2px 3px;
+  }
+
+  .shortcut-key-combination kbd {
+    min-width: 0;
+    padding: 2px 4px;
+    font-size: 9px;
+  }
+}

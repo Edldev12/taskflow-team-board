@@ -163,6 +163,15 @@ describe("dashboard task statistics", () => {
     expect(
       screen.getByRole("heading", { name: "How to Use Drag and Drop" })
     ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Keyboard Shortcuts" })
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("table", {
+        name: "Keyboard controls available in TaskFlow",
+      })
+    ).toBeTruthy();
+    expect(screen.getByText(/not currently connected to task filtering/i)).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Edit a task" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Delete a task" })).toBeTruthy();
     expect(

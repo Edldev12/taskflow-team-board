@@ -15,6 +15,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import HelpDragDropGuide from "./HelpDragDropGuide";
+import KeyboardShortcutsSection from "./KeyboardShortcutsSection";
 import "./HelpCenter.css";
 
 const creationSteps = [
@@ -240,6 +241,8 @@ function HelpCenter({ onReturnToDashboard }) {
       </section>
 
       <HelpDragDropGuide />
+
+      <KeyboardShortcutsSection />
 
       <section className="help-fields-section" aria-labelledby="task-fields-title">
         <div className="help-section-heading">
