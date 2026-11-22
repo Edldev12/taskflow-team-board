@@ -92,6 +92,13 @@ function CalendarPage({ columns }) {
     );
   }
 
+  function goToToday() {
+    const currentDate = new Date();
+    setDisplayedMonth(
+      new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+    );
+  }
+
   return (
     <section
       className="dashboard-content calendar-page"
@@ -120,6 +127,13 @@ function CalendarPage({ columns }) {
               onClick={() => changeMonth(-1)}
             >
               <ChevronLeft size={18} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="calendar-today-button"
+              onClick={goToToday}
+            >
+              Today
             </button>
             <button
               type="button"

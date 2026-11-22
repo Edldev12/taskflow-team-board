@@ -49,13 +49,32 @@
   cursor: pointer;
 }
 
+.calendar-today-button {
+  min-width: 62px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: #2876bd;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .calendar-month-button:hover {
   border-color: #9cc8f1;
   background: #eaf4ff;
   color: #2876bd;
 }
 
-.calendar-month-button:focus-visible {
+.calendar-today-button:hover {
+  border-color: #9cc8f1;
+  background: #eaf4ff;
+}
+
+.calendar-month-button:focus-visible,
+.calendar-today-button:focus-visible {
   outline: 3px solid #2876bd;
   outline-offset: 2px;
 }
@@ -234,6 +253,15 @@
   color: #9bcfff;
 }
 
+.app-layout[data-theme="dark"] .calendar-today-button {
+  color: #9bcfff;
+}
+
+.app-layout[data-theme="dark"] .calendar-today-button:hover {
+  border-color: #48617e;
+  background: #30465e;
+}
+
 @media (max-width: 650px) {
   .monthly-calendar {
     padding: 14px 10px;
@@ -241,6 +269,10 @@
 
   .calendar-toolbar {
     margin-bottom: 12px;
+  }
+
+  .calendar-month-controls {
+    gap: 5px;
   }
 
   .calendar-toolbar h2 {

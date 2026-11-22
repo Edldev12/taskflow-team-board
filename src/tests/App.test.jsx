@@ -405,16 +405,62 @@ describe("dashboard task statistics", () => {
       true
     );
 
+    const formatMonthLabel = (date) =>
+      new Intl.DateTimeFormat(undefined, {
+        month: "long",
+        year: "numeric",
+      }).format(date);
+    for (let monthIndex = today.getMonth(); monthIndex < 11; monthIndex += 1) {
+      await user.click(screen.getByRole("button", { name: "Next month" }));
+    }
+
+    const december = new Date(today.getFullYear(), 11, 1);
+    let decemberTable = screen.getByRole("table", {
+      name: `${formatMonthLabel(december)} calendar`,
+    });
+    expect(within(decemberTable).getAllByRole("cell")).toHaveLength(42);
+
     await user.click(screen.getByRole("button", { name: "Next month" }));
-    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    const nextMonthLabel = new Intl.DateTimeFormat(undefined, {
+    const january = new Date(today.getFullYear() + 1, 0, 1);
+    const januaryTable = screen.getByRole("table", {
+      name: `${formatMonthLabel(january)} calendar`,
+    });
+    const januaryCells = within(januaryTable).getAllByRole("cell");
+    const januaryDates = januaryCells.map(
+      (cell) => cell.querySelector("time").dateTime
+    );
+    expect(januaryCells).toHaveLength(42);
+    expect(new Set(januaryDates).size).toBe(42);
+    const januaryFirstIndex = januaryDates.indexOf(
+      `${january.getFullYear()}-01-01`
+    );
+    expect(januaryFirstIndex % 7).toBe(january.getDay());
+
+    await user.click(screen.getByRole("button", { name: "Previous month" }));
+    decemberTable = screen.getByRole("table", {
+      name: `${formatMonthLabel(december)} calendar`,
+    });
+    expect(decemberTable).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Today" }));
+    const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    expect(
+      screen.getByRole("table", {
+        name: `${formatMonthLabel(currentMonth)} calendar`,
+      })
+    ).toBeTruthy();
+
+    const followingMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    const followingMonthLabel = new Intl.DateTimeFormat(undefined, {
       month: "long",
       year: "numeric",
-    }).format(nextMonth);
-    calendarTable = within(calendarPage).getByRole("table", {
-      name: `${nextMonthLabel} calendar`,
-    });
-    expect(within(calendarTable).getAllByRole("cell")).toHaveLength(42);
+    }).format(followingMonth);
+    await user.click(screen.getByRole("button", { name: "Next month" }));
+    expect(
+      screen.getByRole("table", {
+        name: `${followingMonthLabel} calendar`,
+      })
+    ).toBeTruthy();
   });
 
   it("assigns missing due dates by status and displays tasks on their saved dates", async () => {
