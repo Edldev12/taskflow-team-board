@@ -468,7 +468,7 @@ describe("dashboard task statistics", () => {
     ).toBeTruthy();
   });
 
-  it("navigates between Dashboard and the My Tasks board", async () => {
+  it("navigates between Dashboard and My Tasks", async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -490,6 +490,106 @@ describe("dashboard task statistics", () => {
     expect(
       screen.getByRole("link", { name: /My Tasks/ }).getAttribute("aria-current")
     ).toBeNull();
+  });
+
+  it("shows all shared tasks and reflects create, edit, and delete changes", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<App />);
+
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+
+    let myTasksPage = screen.getByRole("region", { name: "My Tasks" });
+    expect(
+      within(myTasksPage).getByRole("group", { name: "Total Tasks" }).textContent
+    ).toContain("10");
+    const initialTask = within(myTasksPage).getByRole("article", {
+      name: "Design landing page, To Do",
+    });
+    expect(within(initialTask).getByText("No description provided.")).toBeTruthy();
+    expect(within(initialTask).getByText("To Do")).toBeTruthy();
+    expect(within(initialTask).getByText("Design")).toBeTruthy();
+    expect(within(initialTask).getByText("High")).toBeTruthy();
+    expect(initialTask.querySelector("time")?.getAttribute("dateTime")).toMatch(
+      /^\d{4}-\d{2}-\d{2}$/
+    );
+
+    await user.click(within(myTasksPage).getByRole("button", { name: "Add Task" }));
+    await user.type(screen.getByLabelText("Task Title *"), "Track My Tasks updates");
+    await user.type(screen.getByLabelText("Description"), "Keep this list current.");
+    await user.click(screen.getByRole("button", { name: "Create Task" }));
+
+    await user.click(screen.getByRole("link", { name: /Dashboard/ }));
+    expect(
+      screen.getByRole("article", {
+        name: /Track My Tasks updates, To Do/,
+      })
+    ).toBeTruthy();
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+    myTasksPage = screen.getByRole("region", { name: "My Tasks" });
+
+    expect(
+      within(myTasksPage).getByRole("group", { name: "Total Tasks" }).textContent
+    ).toContain("11");
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Track My Tasks updates, To Do",
+      })
+    ).toBeTruthy();
+    expect(within(myTasksPage).getByText("Keep this list current.")).toBeTruthy();
+
+    await user.click(
+      within(myTasksPage).getByRole("button", {
+        name: "Edit Track My Tasks updates",
+      })
+    );
+    const titleInput = screen.getByLabelText("Task Title *");
+    await user.clear(titleInput);
+    await user.type(titleInput, "Updated My Tasks item");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Updated My Tasks item, To Do",
+      })
+    ).toBeTruthy();
+
+    await user.click(
+      within(myTasksPage).getByRole("button", {
+        name: "Delete Updated My Tasks item",
+      })
+    );
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(
+      within(myTasksPage).getByRole("group", { name: "Total Tasks" }).textContent
+    ).toContain("10");
+    expect(
+      within(myTasksPage).queryByRole("article", {
+        name: "Updated My Tasks item, To Do",
+      })
+    ).toBeNull();
+  });
+
+  it("shows an empty state when all shared task columns are empty", async () => {
+    localStorage.setItem(
+      "taskflow-team-board.columns",
+      JSON.stringify([
+        { id: "todo", tasks: [] },
+        { id: "in-progress", tasks: [] },
+        { id: "done", tasks: [] },
+      ])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+
+    const myTasksPage = screen.getByRole("region", { name: "My Tasks" });
+    expect(within(myTasksPage).getByRole("heading", { name: "No tasks yet" })).toBeTruthy();
+    expect(
+      within(myTasksPage).getByRole("group", { name: "Total Tasks" }).textContent
+    ).toContain("0");
+    expect(within(myTasksPage).queryByRole("article")).toBeNull();
   });
 
   it("assigns missing due dates by status and displays tasks on their saved dates", async () => {

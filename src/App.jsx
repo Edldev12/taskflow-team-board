@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import CalendarPage from "./components/CalendarPage";
 import Header from "./components/Header";
 import HelpCenter from "./components/HelpCenter";
+import MyTasksPage from "./components/MyTasksPage";
 import SettingsPage from "./components/SettingsPage";
 import TaskColumn from "./components/TaskColumn";
 import YourProgressPage from "./components/YourProgressPage";
@@ -929,6 +930,14 @@ function App() {
             columns={columns}
             onEditTask={openEditModal}
             isEditModalOpen={isModalOpen}
+          />
+        ) : activePage === "my-tasks" ? (
+          <MyTasksPage
+            columns={columns}
+            onCreateTask={openCreateModal}
+            onEditTask={openEditModal}
+            onDeleteTask={deleteTask}
+            createButtonRef={triggerRef}
           />
         ) : (
           <section className="dashboard-content" id="dashboard">
