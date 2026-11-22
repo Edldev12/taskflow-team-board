@@ -627,6 +627,69 @@ describe("dashboard task statistics", () => {
     expect(within(myTasksPage).getAllByRole("article")).toHaveLength(10);
   });
 
+  it("searches task titles, descriptions, and labels with filters and updates live", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+
+    const myTasksPage = screen.getByRole("region", { name: "My Tasks" });
+    const search = screen.getByRole("searchbox", { name: "Search tasks" });
+    const statusFilter = within(myTasksPage).getByLabelText("Status");
+    const priorityFilter = within(myTasksPage).getByLabelText("Priority");
+
+    await user.type(search, "dEsIgN lAnDiNg");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(1);
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Design landing page, To Do",
+      })
+    ).toBeTruthy();
+    expect(within(myTasksPage).getByText("Showing 1 of 10 tasks")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Clear task search" }));
+    expect(search.value).toBe("");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(10);
+
+    await user.type(search, "development");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(2);
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Configure Vite, Done",
+      })
+    ).toBeTruthy();
+
+    await user.clear(search);
+    await user.selectOptions(statusFilter, "todo");
+    await user.selectOptions(priorityFilter, "High");
+    await user.type(search, "design");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(1);
+
+    await user.clear(search);
+    await user.type(search, "no matching task");
+    await user.click(screen.getByRole("button", { name: "Add Task" }));
+    await user.type(screen.getByLabelText("Task Title *"), "Keyword container");
+    await user.type(
+      screen.getByLabelText("Description"),
+      "Distinctive searchable description"
+    );
+    await user.click(screen.getByRole("button", { name: "Create Task" }));
+    expect(
+      within(myTasksPage).getByRole("heading", {
+        name: "No tasks match your search",
+      })
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Clear Filters" }));
+    await user.type(search, "DISTINCTIVE SEARCHABLE DESCRIPTION");
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Keyword container, To Do",
+      })
+    ).toBeTruthy();
+    expect(within(myTasksPage).getByText("Showing 1 of 11 tasks")).toBeTruthy();
+  });
+
   it("shows an empty state when all shared task columns are empty", async () => {
     localStorage.setItem(
       "taskflow-team-board.columns",
@@ -1028,7 +1091,7 @@ describe("dashboard task statistics", () => {
       })
     ).toBeTruthy();
     expect(
-      screen.getByText(/The header displays a Search tasks field/i)
+      screen.getByText(/Use the Search tasks field in the top navigation/i)
     ).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Edit a task" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Delete a task" })).toBeTruthy();

@@ -283,6 +283,7 @@ function App() {
   );
   const [activePage, setActivePage] = useState("dashboard");
   const [columns, setColumns] = useState(loadTaskColumns);
+  const [taskSearchQuery, setTaskSearchQuery] = useState("");
   const [defaultTaskDueDate, setDefaultTaskDueDate] = useState("");
   const [notifications, setNotifications] = useState(loadNotifications);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -900,6 +901,8 @@ function App() {
           profile={profile}
           theme={theme}
           onThemeChange={toggleTheme}
+          searchQuery={taskSearchQuery}
+          onSearchQueryChange={setTaskSearchQuery}
           notifications={notifications}
           onNotificationsRead={markNotificationsRead}
         />
@@ -934,6 +937,8 @@ function App() {
         ) : activePage === "my-tasks" ? (
           <MyTasksPage
             columns={columns}
+            searchQuery={taskSearchQuery}
+            onSearchQueryChange={setTaskSearchQuery}
             onCreateTask={openCreateModal}
             onEditTask={openEditModal}
             onDeleteTask={deleteTask}

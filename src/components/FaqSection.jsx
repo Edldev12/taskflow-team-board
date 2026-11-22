@@ -65,7 +65,7 @@ const faqItems = [
     icon: Search,
     question: "How can I search for a particular task?",
     answer:
-      "The header displays a Search tasks field, but it is not currently connected to task filtering. There is no in-app task search yet; you can locate a task by checking its board column.",
+      "Use the Search tasks field in the top navigation while viewing My Tasks. It searches task titles, descriptions, and labels, is case-insensitive, and works together with the status and priority filters.",
   },
   {
     id: "filter-labels",

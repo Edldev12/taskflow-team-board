@@ -22,6 +22,8 @@ function formatDueDate(dueDate) {
 
 function MyTasksPage({
   columns,
+  searchQuery,
+  onSearchQueryChange,
   onCreateTask,
   onEditTask,
   onDeleteTask,
@@ -40,17 +42,41 @@ function MyTasksPage({
   );
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredTasks = useMemo(
-    () =>
-      tasks.filter(
-        ({ task, statusId }) =>
-          (statusFilter === "all" || statusId === statusFilter) &&
-          (priorityFilter === "all" || task.priority === priorityFilter)
-      ),
-    [priorityFilter, statusFilter, tasks]
+    () => {
+      if (
+        statusFilter === "all" &&
+        priorityFilter === "all" &&
+        !normalizedSearchQuery
+      ) {
+        return tasks;
+      }
+
+      return tasks.filter(({ task, statusId }) => {
+        if (statusFilter !== "all" && statusId !== statusFilter) return false;
+        if (priorityFilter !== "all" && task.priority !== priorityFilter) {
+          return false;
+        }
+        if (!normalizedSearchQuery) return true;
+
+        const searchableText = [
+          task.title,
+          task.description,
+          task.label,
+        ].filter((value) => typeof value === "string");
+
+        return searchableText.some((value) =>
+          value.toLowerCase().includes(normalizedSearchQuery)
+        );
+      });
+    },
+    [normalizedSearchQuery, priorityFilter, statusFilter, tasks]
   );
   const hasActiveFilters =
-    statusFilter !== "all" || priorityFilter !== "all";
+    statusFilter !== "all" ||
+    priorityFilter !== "all" ||
+    normalizedSearchQuery !== "";
 
   return (
     <section
@@ -158,6 +184,7 @@ function MyTasksPage({
                 onClick={() => {
                   setStatusFilter("all");
                   setPriorityFilter("all");
+                  onSearchQueryChange("");
                 }}
                 disabled={!hasActiveFilters}
               >
@@ -168,8 +195,20 @@ function MyTasksPage({
 
           {filteredTasks.length === 0 ? (
             <div className="my-tasks-no-results">
-              <h2>No tasks match these filters</h2>
-              <p>Change your filters or clear them to see all tasks.</p>
+              <h2>
+                {normalizedSearchQuery
+                  ? "No tasks match your search"
+                  : "No tasks match these filters"}
+              </h2>
+              <p>
+                {normalizedSearchQuery
+                  ? `No tasks match “${searchQuery.trim()}”${
+                      statusFilter !== "all" || priorityFilter !== "all"
+                        ? " with the selected filters."
+                        : ". Try a different search."
+                    }`
+                  : "Change your filters or clear them to see all tasks."}
+              </p>
             </div>
           ) : (
             <div className="my-task-grid">
