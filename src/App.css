@@ -90,6 +90,11 @@
   color: #2876bd;
 }
 
+.nav-link:focus-visible {
+  outline: 2px solid #2876bd;
+  outline-offset: 2px;
+}
+
 .nav-link.active {
   font-weight: 650;
 }

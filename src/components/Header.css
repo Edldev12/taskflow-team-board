@@ -38,6 +38,12 @@
   font: inherit;
 }
 
+.header-search:focus-within {
+  border-color: #2876bd;
+  outline: 2px solid rgba(40, 118, 189, 0.25);
+  outline-offset: 2px;
+}
+
 .header-actions {
   display: flex;
   align-items: center;

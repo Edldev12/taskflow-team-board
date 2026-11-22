@@ -1,0 +1,249 @@
+.help-status-priority-section {
+  padding: 22px;
+  margin-bottom: 22px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(38, 55, 74, 0.04);
+}
+
+.help-status-priority-section > .help-section-heading {
+  margin-bottom: 19px;
+}
+
+.help-status-priority-section > .help-section-heading h2 {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 19px;
+}
+
+.help-status-priority-section > .help-section-heading > p:last-child {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.help-status-subheading {
+  margin: 0 0 12px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.help-status-card-grid,
+.help-priority-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.help-status-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--background);
+}
+
+.help-status-card-icon,
+.help-status-footer-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  border-radius: 9px;
+}
+
+.help-status-card-icon {
+  width: 38px;
+  height: 38px;
+}
+
+.help-status-card--todo .help-status-card-icon {
+  background: #eaf4ff;
+  color: #3978b5;
+}
+
+.help-status-card--in-progress .help-status-card-icon {
+  background: #fff5e6;
+  color: #b98132;
+}
+
+.help-status-card--done .help-status-card-icon {
+  background: #e9f7ef;
+  color: #39875c;
+}
+
+.help-status-card h4 {
+  margin: 1px 0 5px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.help-status-card p,
+.help-priority-card p,
+.help-status-movement-note p,
+.help-status-tips li {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.help-status-badge {
+  display: inline-flex;
+  grid-column: 2;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.help-status-badge--todo {
+  background: #eaf4ff;
+  color: #3978b5;
+}
+
+.help-status-badge--in-progress {
+  background: #fff5e6;
+  color: #b98132;
+}
+
+.help-status-badge--done {
+  background: #e9f7ef;
+  color: #39875c;
+}
+
+.help-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.help-priority-cards {
+  padding-top: 20px;
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.help-priority-intro {
+  margin: -5px 0 13px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.help-priority-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--background);
+}
+
+.help-priority-card .priority {
+  font-weight: 700;
+}
+
+.help-status-priority-footer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.help-status-movement-note,
+.help-status-tips {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.help-status-footer-icon {
+  width: 36px;
+  height: 36px;
+  background: #eaf4ff;
+  color: #2876bd;
+}
+
+.help-status-movement-note h3,
+.help-status-tips h3 {
+  margin: 1px 0 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.help-status-tips ul {
+  display: grid;
+  gap: 5px;
+  padding-left: 16px;
+  margin: 0;
+}
+
+.app-layout[data-theme="dark"] .help-status-card--todo .help-status-card-icon,
+.app-layout[data-theme="dark"] .help-status-footer-icon {
+  background: #30465e;
+  color: #9bcfff;
+}
+
+.app-layout[data-theme="dark"] .help-status-card--in-progress .help-status-card-icon {
+  background: #514630;
+  color: #f5d28c;
+}
+
+.app-layout[data-theme="dark"] .help-status-card--done .help-status-card-icon {
+  background: #304b3d;
+  color: #a6e2bd;
+}
+
+.app-layout[data-theme="dark"] .help-status-badge--todo {
+  background: #30465e;
+  color: #b9dcff;
+}
+
+.app-layout[data-theme="dark"] .help-status-badge--in-progress {
+  background: #514630;
+  color: #f5d28c;
+}
+
+.app-layout[data-theme="dark"] .help-status-badge--done {
+  background: #304b3d;
+  color: #a6e2bd;
+}
+
+@media (max-width: 850px) {
+  .help-status-card-grid,
+  .help-priority-card-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 650px) {
+  .help-status-priority-section {
+    padding: 16px;
+  }
+
+  .help-status-card-grid,
+  .help-priority-card-grid,
+  .help-status-priority-footer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

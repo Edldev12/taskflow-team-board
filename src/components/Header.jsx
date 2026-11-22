@@ -6,7 +6,7 @@ function Header() {
     <header className="top-header">
       <div className="header-search">
         <span className="search-icon">⌕</span>
-        <input type="search" placeholder="Search tasks..." />
+        <input type="search" placeholder="Search tasks..." aria-label="Search tasks" />
       </div>
 
       <div className="header-actions">
