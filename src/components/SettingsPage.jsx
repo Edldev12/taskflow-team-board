@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
+import ApplicationPreferencesSection from "./ApplicationPreferencesSection";
 import ProfileInformationSection from "./ProfileInformationSection";
 import "./SettingsPage.css";
 
@@ -30,6 +31,8 @@ function SettingsPage({
   onThemePreferenceChange,
   profile,
   onSaveProfile,
+  applicationPreferences,
+  onApplicationPreferencesChange,
 }) {
   const headingRef = useRef(null);
 
@@ -96,6 +99,11 @@ function SettingsPage({
             : " — set by your selection."}
         </p>
       </section>
+
+      <ApplicationPreferencesSection
+        preferences={applicationPreferences}
+        onPreferencesChange={onApplicationPreferencesChange}
+      />
 
       <ProfileInformationSection
         profile={profile}

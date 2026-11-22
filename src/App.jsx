@@ -7,6 +7,10 @@ import TaskColumn from "./components/TaskColumn";
 import YourProgressPage from "./components/YourProgressPage";
 import "./App.css";
 import TaskModal from "./components/TaskModal";
+import {
+  loadApplicationPreferences,
+  saveApplicationPreferences,
+} from "./utils/applicationPreferencesStorage";
 import { loadProfile, saveProfile } from "./utils/profileStorage";
 
 const taskColumns = [
@@ -218,6 +222,9 @@ function App() {
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
   const theme = themePreference === "system" ? systemTheme : themePreference;
   const [profile, setProfile] = useState(loadProfile);
+  const [applicationPreferences, setApplicationPreferences] = useState(
+    loadApplicationPreferences
+  );
   const [activePage, setActivePage] = useState("dashboard");
   const [columns, setColumns] = useState(loadTaskColumns);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -291,6 +298,17 @@ function App() {
   }, [themePreference]);
 
   useEffect(() => {
+    const rootElement = document.documentElement;
+    if (applicationPreferences.motionPreference === "reduced") {
+      rootElement.setAttribute("data-app-motion", "reduced");
+    } else {
+      rootElement.removeAttribute("data-app-motion");
+    }
+
+    return () => rootElement.removeAttribute("data-app-motion");
+  }, [applicationPreferences.motionPreference]);
+
+  useEffect(() => {
     if (!taskAnnouncement) return;
 
     const timeoutId = window.setTimeout(() => {
@@ -326,6 +344,12 @@ function App() {
   function handleSaveProfile(nextProfile) {
     if (!saveProfile(nextProfile)) return false;
     setProfile(nextProfile);
+    return true;
+  }
+
+  function handleApplicationPreferencesChange(nextPreferences) {
+    if (!saveApplicationPreferences(nextPreferences)) return false;
+    setApplicationPreferences(nextPreferences);
     return true;
   }
 
@@ -632,7 +656,14 @@ function App() {
   }
 
   return (
-    <div className="app-layout" data-theme={theme}>
+    <div
+      className="app-layout"
+      data-theme={theme}
+      data-motion-preference={applicationPreferences.motionPreference}
+      data-task-density={
+        applicationPreferences.compactTaskCards ? "compact" : "comfortable"
+      }
+    >
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-icon">✓</div>
@@ -744,6 +775,10 @@ function App() {
             onThemePreferenceChange={setThemePreference}
             profile={profile}
             onSaveProfile={handleSaveProfile}
+            applicationPreferences={applicationPreferences}
+            onApplicationPreferencesChange={
+              handleApplicationPreferencesChange
+            }
           />
         ) : activePage === "progress" ? (
           <YourProgressPage

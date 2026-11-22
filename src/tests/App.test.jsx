@@ -245,10 +245,13 @@ describe("dashboard task statistics", () => {
     expect(appLayout.getAttribute("data-theme")).toBe("dark");
 
     await user.click(screen.getByRole("link", { name: /Settings/ }));
+    const appearanceSection = screen.getByRole("region", {
+      name: "Appearance",
+    });
     expect(
       screen.getByRole("heading", { name: "Appearance" })
     ).toBeTruthy();
-    expect(screen.getByRole("status").textContent).toContain(
+    expect(within(appearanceSection).getByRole("status").textContent).toContain(
       "Currently active: Dark Mode"
     );
 
@@ -265,9 +268,58 @@ describe("dashboard task statistics", () => {
     expect(localStorage.getItem("taskflow-team-board.theme")).toBeNull();
     act(() => handleSystemThemeChange({ matches: true }));
     expect(appLayout.getAttribute("data-theme")).toBe("dark");
-    expect(screen.getByRole("status").textContent).toContain(
-      "following your device preference"
+    expect(
+      within(appearanceSection).getByRole("status").textContent
+    ).toContain("following your device preference");
+  });
+
+  it("applies and restores application preferences", async () => {
+    const user = userEvent.setup();
+    const { container, unmount } = render(<App />);
+    await user.click(screen.getByRole("link", { name: /Settings/ }));
+
+    const preferencesSection = screen.getByRole("region", {
+      name: "Application Preferences",
+    });
+    const compactTaskCards = within(preferencesSection).getByRole("checkbox", {
+      name: "Compact task cards",
+    });
+
+    expect(compactTaskCards.checked).toBe(false);
+    await user.click(within(preferencesSection).getByText("Compact task cards"));
+    expect(compactTaskCards.checked).toBe(true);
+    expect(container.querySelector(".app-layout").dataset.taskDensity).toBe(
+      "compact"
     );
+
+    await user.click(
+      within(preferencesSection).getByRole("radio", {
+        name: /Always reduce motion/,
+      })
+    );
+    expect(
+      container.querySelector(".app-layout").dataset.motionPreference
+    ).toBe("reduced");
+    expect(document.documentElement.dataset.appMotion).toBe("reduced");
+    expect(
+      JSON.parse(
+        localStorage.getItem("taskflow-team-board.application-preferences")
+      )
+    ).toEqual({
+      compactTaskCards: true,
+      motionPreference: "reduced",
+    });
+
+    unmount();
+    expect(document.documentElement.dataset.appMotion).toBeUndefined();
+    const { container: restoredContainer } = render(<App />);
+    await user.click(screen.getByRole("link", { name: /Settings/ }));
+    expect(
+      restoredContainer.querySelector(".app-layout").dataset.taskDensity
+    ).toBe("compact");
+    expect(
+      restoredContainer.querySelector(".app-layout").dataset.motionPreference
+    ).toBe("reduced");
   });
 
   it("opens the task creation guide from Help and returns to the dashboard", async () => {
