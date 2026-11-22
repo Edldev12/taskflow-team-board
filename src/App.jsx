@@ -1,6 +1,6 @@
 
 import { useEffect, useRef, useState } from "react";
-import { CircleCheck, Clock3, ListTodo } from "lucide-react";
+import { CircleCheck, Clock3, ListTodo, Percent } from "lucide-react";
 import Header from "./components/Header";
 import TaskColumn from "./components/TaskColumn";
 import TaskStatsCard from "./components/TaskStatsCard";
@@ -222,6 +222,10 @@ function App() {
         : total,
     0
   );
+  const completionPercentage =
+    totalTaskCount === 0
+      ? 0
+      : Math.round((completedTaskCount / totalTaskCount) * 100);
 
   useEffect(() => {
     if (!taskAnnouncement) return;
@@ -676,6 +680,13 @@ function App() {
               count={pendingTaskCount}
               icon={Clock3}
               variant="pending"
+            />
+            <TaskStatsCard
+              label="Completion Percentage"
+              count={`${completionPercentage}%`}
+              icon={Percent}
+              variant="completion"
+              progress={completionPercentage}
             />
           </div>
 

@@ -193,7 +193,7 @@
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 14px;
   width: 100%;
-  max-width: 640px;
+  max-width: 840px;
   margin-bottom: 22px;
 }
 
@@ -241,6 +241,27 @@
 .task-stats-card--pending .task-stats-icon {
   background: #fff5e6;
   color: #b98132;
+}
+
+.task-stats-card--with-progress {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+}
+
+.task-stats-progress {
+  grid-column: 1 / -1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--background);
+}
+
+.task-stats-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2876bd;
+  transition: width 180ms ease;
 }
 
 .add-task-button {
@@ -491,6 +512,10 @@
 .app-layout[data-theme="dark"] .task-stats-card--pending .task-stats-icon {
   background: #514630;
   color: #f5d28c;
+}
+
+.app-layout[data-theme="dark"] .task-stats-progress span {
+  background: #72b7f5;
 }
 
 .app-layout[data-theme="dark"] .task-column {
