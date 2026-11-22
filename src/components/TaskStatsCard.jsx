@@ -1,17 +1,9 @@
 import { ListTodo } from "lucide-react";
 
-function TaskStatsCard({
-  label,
-  count,
-  icon: Icon = ListTodo,
-  variant,
-  progress,
-}) {
+function TaskStatsCard({ label, count, icon: Icon = ListTodo, variant }) {
   return (
     <section
-      className={`task-stats-card${variant ? ` task-stats-card--${variant}` : ""}${
-        progress !== undefined ? " task-stats-card--with-progress" : ""
-      }`}
+      className={`task-stats-card${variant ? ` task-stats-card--${variant}` : ""}`}
       role="group"
       aria-label={label}
     >
@@ -22,18 +14,6 @@ function TaskStatsCard({
         <p>{label}</p>
         <strong>{count}</strong>
       </div>
-      {progress !== undefined && (
-        <div
-          className="task-stats-progress"
-          role="progressbar"
-          aria-label="Task completion"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={progress}
-        >
-          <span style={{ width: `${progress}%` }} />
-        </div>
-      )}
     </section>
   );
 }

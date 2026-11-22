@@ -1,9 +1,8 @@
 
-import { useEffect, useRef, useState } from "react";
-import { CircleCheck, Clock3, ListTodo, Percent } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Header from "./components/Header";
 import TaskColumn from "./components/TaskColumn";
-import TaskStatsCard from "./components/TaskStatsCard";
+import TaskProgressSection from "./components/TaskProgressSection";
 import "./App.css";
 import TaskModal from "./components/TaskModal";
 
@@ -206,26 +205,31 @@ function App() {
   const pendingKeyboardFocusTaskId = useRef(null);
   const lastTaskAnnouncementRef = useRef(null);
   const [selectedTask, setSelectedTask] = useState(null);
-  const totalTaskCount = columns.reduce(
-    (total, column) => total + column.tasks.length,
-    0
-  );
-  const completedTaskCount = columns.reduce(
-    (total, column) =>
-      column.id === "done" ? total + column.tasks.length : total,
-    0
-  );
-  const pendingTaskCount = columns.reduce(
-    (total, column) =>
-      column.id === "todo" || column.id === "in-progress"
-        ? total + column.tasks.length
-        : total,
-    0
-  );
-  const completionPercentage =
-    totalTaskCount === 0
-      ? 0
-      : Math.round((completedTaskCount / totalTaskCount) * 100);
+  const taskStats = useMemo(() => {
+    const counts = columns.reduce(
+      (stats, column) => {
+        const columnTaskCount = column.tasks.length;
+        stats.total += columnTaskCount;
+
+        if (column.id === "done") {
+          stats.completed += columnTaskCount;
+        } else if (column.id === "todo" || column.id === "in-progress") {
+          stats.pending += columnTaskCount;
+        }
+
+        return stats;
+      },
+      { total: 0, completed: 0, pending: 0 }
+    );
+
+    return {
+      ...counts,
+      completionPercentage:
+        counts.total === 0
+          ? 0
+          : Math.round((counts.completed / counts.total) * 100),
+    };
+  }, [columns]);
 
   useEffect(() => {
     if (!taskAnnouncement) return;
@@ -663,32 +667,12 @@ function App() {
             </button>
           </div>
 
-          <div className="task-stats-grid">
-            <TaskStatsCard
-              label="Total Tasks"
-              count={totalTaskCount}
-              icon={ListTodo}
-            />
-            <TaskStatsCard
-              label="Completed Tasks"
-              count={completedTaskCount}
-              icon={CircleCheck}
-              variant="completed"
-            />
-            <TaskStatsCard
-              label="Pending Tasks"
-              count={pendingTaskCount}
-              icon={Clock3}
-              variant="pending"
-            />
-            <TaskStatsCard
-              label="Completion Percentage"
-              count={`${completionPercentage}%`}
-              icon={Percent}
-              variant="completion"
-              progress={completionPercentage}
-            />
-          </div>
+          <TaskProgressSection
+            totalTasks={taskStats.total}
+            completedTasks={taskStats.completed}
+            pendingTasks={taskStats.pending}
+            completionPercentage={taskStats.completionPercentage}
+          />
 
           {/*
           <div className="task-board">

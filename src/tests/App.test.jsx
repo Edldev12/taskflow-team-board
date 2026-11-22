@@ -19,12 +19,12 @@ describe("dashboard task statistics", () => {
 
     const totalTasks = screen.getByRole("group", { name: "Total Tasks" });
     const pendingTasks = screen.getByRole("group", { name: "Pending Tasks" });
-    const completion = screen.getByRole("group", {
-      name: "Completion Percentage",
+    const progress = screen.getByRole("progressbar", {
+      name: "Overall project completion",
     });
     expect(totalTasks.textContent).toContain("10");
     expect(pendingTasks.textContent).toContain("7");
-    expect(completion.textContent).toContain("30%");
+    expect(progress.getAttribute("aria-valuenow")).toBe("30");
 
     await user.click(screen.getByRole("button", { name: /add task/i }));
     await user.type(screen.getByLabelText("Task Title *"), "Track dashboard count");
@@ -32,14 +32,14 @@ describe("dashboard task statistics", () => {
 
     expect(totalTasks.textContent).toContain("11");
     expect(pendingTasks.textContent).toContain("8");
-    expect(completion.textContent).toContain("27%");
+    expect(progress.getAttribute("aria-valuenow")).toBe("27");
 
     vi.spyOn(window, "confirm").mockReturnValue(true);
     await user.click(screen.getByRole("button", { name: "Delete Design landing page" }));
 
     expect(totalTasks.textContent).toContain("10");
     expect(pendingTasks.textContent).toContain("7");
-    expect(completion.textContent).toContain("30%");
+    expect(progress.getAttribute("aria-valuenow")).toBe("30");
   });
 
   it("updates the completed count when tasks move into and out of Done", async () => {
@@ -50,30 +50,46 @@ describe("dashboard task statistics", () => {
       name: "Completed Tasks",
     });
     const pendingTasks = screen.getByRole("group", { name: "Pending Tasks" });
-    const completion = screen.getByRole("group", {
-      name: "Completion Percentage",
+    const progress = screen.getByRole("progressbar", {
+      name: "Overall project completion",
     });
     expect(completedTasks.textContent).toContain("3");
     expect(pendingTasks.textContent).toContain("7");
-    expect(completion.textContent).toContain("30%");
+    expect(progress.getAttribute("aria-valuenow")).toBe("30");
 
     let task = screen.getByRole("article", {
       name: /Design landing page, To Do/,
     });
     await user.click(task);
-    await user.keyboard("{Enter}{ArrowRight}{ArrowRight}{Enter}");
+    await user.keyboard("{Enter}{ArrowRight}{Enter}");
+    expect(pendingTasks.textContent).toContain("7");
+    expect(progress.getAttribute("aria-valuenow")).toBe("30");
+
+    task = screen.getByRole("article", {
+      name: /Design landing page, In Progress/,
+    });
+    await user.click(task);
+    await user.keyboard("{Enter}{ArrowRight}{Enter}");
     expect(completedTasks.textContent).toContain("4");
     expect(pendingTasks.textContent).toContain("6");
-    expect(completion.textContent).toContain("40%");
+    expect(progress.getAttribute("aria-valuenow")).toBe("40");
 
     task = screen.getByRole("article", {
       name: /Design landing page, Done/,
     });
     await user.click(task);
-    await user.keyboard("{Enter}{ArrowLeft}{ArrowLeft}{Enter}");
+    await user.keyboard("{Enter}{ArrowLeft}{Enter}");
+    expect(pendingTasks.textContent).toContain("7");
+    expect(progress.getAttribute("aria-valuenow")).toBe("30");
+
+    task = screen.getByRole("article", {
+      name: /Design landing page, In Progress/,
+    });
+    await user.click(task);
+    await user.keyboard("{Enter}{ArrowLeft}{Enter}");
     expect(completedTasks.textContent).toContain("3");
     expect(pendingTasks.textContent).toContain("7");
-    expect(completion.textContent).toContain("30%");
+    expect(progress.getAttribute("aria-valuenow")).toBe("30");
   });
 
   it("rounds the completion percentage to a whole number", () => {
@@ -95,8 +111,10 @@ describe("dashboard task statistics", () => {
     render(<App />);
 
     expect(
-      screen.getByRole("group", { name: "Completion Percentage" }).textContent
-    ).toContain("67%");
+      screen.getByRole("progressbar", {
+        name: "Overall project completion",
+      }).getAttribute("aria-valuenow")
+    ).toBe("67");
   });
 
   it("shows zero percent when there are no tasks", () => {
@@ -111,14 +129,18 @@ describe("dashboard task statistics", () => {
 
     render(<App />);
 
-    const completion = screen.getByRole("group", {
-      name: "Completion Percentage",
-    });
     const progress = screen.getByRole("progressbar", {
-      name: "Task completion",
+      name: "Overall project completion",
     });
+    const totalTasks = screen.getByRole("group", { name: "Total Tasks" });
+    const completedTasks = screen.getByRole("group", {
+      name: "Completed Tasks",
+    });
+    const pendingTasks = screen.getByRole("group", { name: "Pending Tasks" });
 
-    expect(completion.textContent).toContain("0%");
     expect(progress.getAttribute("aria-valuenow")).toBe("0");
+    expect(totalTasks.textContent).toContain("0");
+    expect(completedTasks.textContent).toContain("0");
+    expect(pendingTasks.textContent).toContain("0");
   });
 });
