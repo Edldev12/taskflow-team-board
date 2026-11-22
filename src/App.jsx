@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Header from "./components/Header";
 import HelpCenter from "./components/HelpCenter";
+import SettingsPage from "./components/SettingsPage";
 import TaskColumn from "./components/TaskColumn";
 import YourProgressPage from "./components/YourProgressPage";
 import "./App.css";
@@ -42,6 +43,26 @@ const taskColumns = [
 ];
 
 const TASK_COLUMNS_STORAGE_KEY = "taskflow-team-board.columns";
+const THEME_PREFERENCE_STORAGE_KEY = "taskflow-team-board.theme";
+
+function loadThemePreference() {
+  try {
+    const preference = window.localStorage.getItem(THEME_PREFERENCE_STORAGE_KEY);
+    return preference === "light" || preference === "dark"
+      ? preference
+      : "system";
+  } catch (error) {
+    console.error("Unable to restore the saved theme preference.", error);
+    return "system";
+  }
+}
+
+function getSystemTheme() {
+  return typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
 
 function loadTaskColumns() {
   try {
@@ -192,7 +213,9 @@ function getTaskMovementAnnouncement(previousColumns, nextColumns, taskId) {
 }
 
 function App() {
-  const [theme, setTheme] = useState("light");
+  const [themePreference, setThemePreference] = useState(loadThemePreference);
+  const [systemTheme, setSystemTheme] = useState(getSystemTheme);
+  const theme = themePreference === "system" ? systemTheme : themePreference;
   const [activePage, setActivePage] = useState("dashboard");
   const [columns, setColumns] = useState(loadTaskColumns);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -233,6 +256,39 @@ function App() {
   }, [columns]);
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)");
+    if (!mediaQuery) return undefined;
+
+    const handleSystemThemeChange = (event) => {
+      setSystemTheme(event.matches ? "dark" : "light");
+    };
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleSystemThemeChange);
+      return () =>
+        mediaQuery.removeEventListener("change", handleSystemThemeChange);
+    }
+
+    mediaQuery.addListener(handleSystemThemeChange);
+    return () => mediaQuery.removeListener(handleSystemThemeChange);
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (themePreference === "system") {
+        window.localStorage.removeItem(THEME_PREFERENCE_STORAGE_KEY);
+      } else {
+        window.localStorage.setItem(
+          THEME_PREFERENCE_STORAGE_KEY,
+          themePreference
+        );
+      }
+    } catch (error) {
+      console.error("Unable to save the theme preference.", error);
+    }
+  }, [themePreference]);
+
+  useEffect(() => {
     if (!taskAnnouncement) return;
 
     const timeoutId = window.setTimeout(() => {
@@ -262,7 +318,7 @@ function App() {
   }, [columns]);
 
   function toggleTheme(selectedTheme) {
-    setTheme(selectedTheme);
+    setThemePreference(selectedTheme);
   }
 
   function announceTaskMovement(previousColumns, nextColumns, taskId) {
@@ -601,7 +657,12 @@ function App() {
             Calendar
           </a>
 
-          <a href="#settings" className="nav-link">
+          <a
+            href="#settings"
+            className={`nav-link${activePage === "settings" ? " active" : ""}`}
+            aria-current={activePage === "settings" ? "page" : undefined}
+            onClick={() => setActivePage("settings")}
+          >
             <span className="nav-icon">⚙</span>
             Settings
           </a>
@@ -663,6 +724,12 @@ function App() {
 
         {activePage === "help" ? (
           <HelpCenter onReturnToDashboard={() => setActivePage("dashboard")} />
+        ) : activePage === "settings" ? (
+          <SettingsPage
+            theme={theme}
+            themePreference={themePreference}
+            onThemePreferenceChange={setThemePreference}
+          />
         ) : activePage === "progress" ? (
           <YourProgressPage
             totalTasks={taskStats.total}

@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App";
+
+let originalWindowMatchMedia;
 
 async function checkProgressAndReturnToDashboard(user, expected) {
   await user.click(screen.getByRole("link", { name: /Your Progress/ }));
@@ -51,6 +53,13 @@ describe("dashboard task statistics", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    if (originalWindowMatchMedia === undefined) {
+      delete window.matchMedia;
+    } else {
+      window.matchMedia = originalWindowMatchMedia;
+    }
+    originalWindowMatchMedia = undefined;
   });
 
   it("counts tasks across columns and updates after creating and deleting a task", async () => {
@@ -214,6 +223,51 @@ describe("dashboard task statistics", () => {
     expect(totalTasks.textContent).toContain("0");
     expect(completedTasks.textContent).toContain("0");
     expect(pendingTasks.textContent).toContain("0");
+  });
+
+  it("supports saved theme choices and follows device changes in system mode", async () => {
+    let handleSystemThemeChange;
+    const mediaQuery = {
+      matches: true,
+      addEventListener: vi.fn((eventName, listener) => {
+        handleSystemThemeChange = listener;
+      }),
+      removeEventListener: vi.fn(),
+    };
+    originalWindowMatchMedia = window.matchMedia;
+    vi.stubGlobal("matchMedia", vi.fn(() => mediaQuery));
+    window.matchMedia = vi.fn(() => mediaQuery);
+
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+    const appLayout = container.querySelector(".app-layout");
+
+    expect(appLayout.getAttribute("data-theme")).toBe("dark");
+
+    await user.click(screen.getByRole("link", { name: /Settings/ }));
+    expect(
+      screen.getByRole("heading", { name: "Appearance" })
+    ).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toContain(
+      "Currently active: Dark Mode"
+    );
+
+    await user.click(screen.getByRole("button", { name: /Light Mode/ }));
+    expect(appLayout.getAttribute("data-theme")).toBe("light");
+    expect(localStorage.getItem("taskflow-team-board.theme")).toBe("light");
+
+    act(() => handleSystemThemeChange({ matches: false }));
+    expect(appLayout.getAttribute("data-theme")).toBe("light");
+
+    await user.click(
+      screen.getByRole("button", { name: /Use device preference/ })
+    );
+    expect(localStorage.getItem("taskflow-team-board.theme")).toBeNull();
+    act(() => handleSystemThemeChange({ matches: true }));
+    expect(appLayout.getAttribute("data-theme")).toBe("dark");
+    expect(screen.getByRole("status").textContent).toContain(
+      "following your device preference"
+    );
   });
 
   it("opens the task creation guide from Help and returns to the dashboard", async () => {
