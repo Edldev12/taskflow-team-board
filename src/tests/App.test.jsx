@@ -158,12 +158,19 @@ describe("dashboard task statistics", () => {
       screen.getByRole("heading", { name: "How to Create Tasks" })
     ).toBeTruthy();
     expect(
+      screen.getByRole("heading", { name: "How to Edit and Delete Tasks" })
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Edit a task" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Delete a task" })).toBeTruthy();
+    expect(
       screen.getByText(
         "Required. Keep it under 100 characters and make the action clear."
       )
     ).toBeTruthy();
     expect(screen.getByText(/free text/i)).toBeTruthy();
     expect(screen.getByText(/Status is not selected in the creation form/i)).toBeTruthy();
+    expect(screen.getByText(/choose OK to remove the task or Cancel to keep it/i)).toBeTruthy();
+    expect(screen.getByText(/Deletion has no undo in this app/i)).toBeTruthy();
 
     await user.click(
       screen.getByRole("button", { name: "Return to Dashboard" })

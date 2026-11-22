@@ -170,8 +170,144 @@
   margin-bottom: 22px;
 }
 
+.help-manage-section {
+  margin-bottom: 22px;
+}
+
 .help-section-heading {
   margin-bottom: 16px;
+}
+
+.help-section-heading > p:not(.help-eyebrow) {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.help-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.help-action-card {
+  min-width: 0;
+  padding: 19px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(38, 55, 74, 0.04);
+}
+
+.help-action-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--border);
+}
+
+.help-action-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  place-items: center;
+  border-radius: 10px;
+  background: #eaf4ff;
+  color: #2876bd;
+}
+
+.help-action-heading h3 {
+  margin: 0 0 4px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.help-action-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.help-action-steps {
+  display: grid;
+  gap: 13px;
+  padding: 17px 0 0;
+  margin: 0;
+  list-style: none;
+}
+
+.help-action-step {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.help-action-step h4 {
+  margin: 1px 0 4px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.help-action-step p,
+.help-action-tip p,
+.help-action-warning p,
+.help-delete-tip {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.help-action-tip,
+.help-action-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px;
+  margin-top: 16px;
+  border-radius: 9px;
+  background: var(--background);
+}
+
+.help-action-tip svg,
+.help-action-warning svg,
+.help-delete-tip svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.help-action-tip svg {
+  color: #2876bd;
+}
+
+.help-action-warning {
+  border: 1px solid #f2d8d2;
+  background: #fff7f5;
+}
+
+.help-action-warning svg {
+  color: #c65e4d;
+}
+
+.help-action-warning p {
+  color: #87493f;
+}
+
+.help-delete-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.help-delete-tip svg {
+  color: #2876bd;
 }
 
 .help-field-grid {
@@ -237,6 +373,7 @@
 .app-layout[data-theme="dark"] .help-guide-icon,
 .app-layout[data-theme="dark"] .help-step-icon,
 .app-layout[data-theme="dark"] .help-info-icon,
+.app-layout[data-theme="dark"] .help-action-icon,
 .app-layout[data-theme="dark"] .help-note-icon {
   background: #30465e;
   color: #9bcfff;
@@ -245,6 +382,15 @@
 .app-layout[data-theme="dark"] .help-step-number {
   background: #30465e;
   color: #9bcfff;
+}
+
+.app-layout[data-theme="dark"] .help-action-warning {
+  border-color: #503b3b;
+  background: #3a2c2d;
+}
+
+.app-layout[data-theme="dark"] .help-action-warning p {
+  color: #ffb5a9;
 }
 
 @media (max-width: 1000px) {
@@ -279,7 +425,8 @@
 
   .help-steps,
   .help-field-grid,
-  .help-bottom-grid {
+  .help-bottom-grid,
+  .help-actions-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 

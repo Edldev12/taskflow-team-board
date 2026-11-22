@@ -7,7 +7,12 @@ import {
   Lightbulb,
   ListTodo,
   MousePointerClick,
+  Pencil,
+  Search,
+  ShieldCheck,
   Tag,
+  Trash2,
+  TriangleAlert,
 } from "lucide-react";
 import "./HelpCenter.css";
 
@@ -35,6 +40,47 @@ const creationSteps = [
     title: "Create and check your task",
     description:
       "Click Create Task. The form closes and the new task appears in the To Do column.",
+  },
+];
+
+const editSteps = [
+  {
+    title: "Find the task",
+    description:
+      "Look through the To Do, In Progress, and Done columns until you find its card.",
+  },
+  {
+    title: "Open the edit form",
+    description:
+      "Select the Edit button at the bottom of that task card. The Edit Task form opens with its current details.",
+  },
+  {
+    title: "Update its details",
+    description:
+      "Change the title, description, priority, or label. Status is not edited in this form; move the task between board columns instead.",
+  },
+  {
+    title: "Save or cancel",
+    description:
+      "Select Save Changes to keep your updates. Select Cancel or close the form to discard unsaved edits.",
+  },
+];
+
+const deleteSteps = [
+  {
+    title: "Locate the task card",
+    description:
+      "Find the task in its current To Do, In Progress, or Done column.",
+  },
+  {
+    title: "Select Delete",
+    description:
+      "Choose the Delete button at the bottom of the task card.",
+  },
+  {
+    title: "Confirm your choice",
+    description:
+      "In the confirmation dialog, choose OK to remove the task or Cancel to keep it.",
   },
 ];
 
@@ -99,6 +145,97 @@ function HelpCenter({ onReturnToDashboard }) {
             </li>
           ))}
         </ol>
+      </section>
+
+      <section
+        className="help-manage-section"
+        aria-labelledby="edit-delete-tasks-title"
+      >
+        <div className="help-section-heading">
+          <p className="help-eyebrow">TASK MANAGEMENT</p>
+          <h2 id="edit-delete-tasks-title">How to Edit and Delete Tasks</h2>
+          <p>Update a task when plans change, or remove one you no longer need.</p>
+        </div>
+
+        <div className="help-actions-grid">
+          <article
+            className="help-action-card"
+            aria-labelledby="edit-task-title"
+          >
+            <header className="help-action-heading">
+              <span className="help-action-icon" aria-hidden="true">
+                <Pencil size={20} />
+              </span>
+              <div>
+                <h3 id="edit-task-title">Edit a task</h3>
+                <p>Keep task details up to date.</p>
+              </div>
+            </header>
+
+            <ol className="help-action-steps">
+              {editSteps.map(({ title, description }, index) => (
+                <li className="help-action-step" key={title}>
+                  <span className="help-step-number" aria-hidden="true">
+                    {index + 1}
+                  </span>
+                  <div>
+                    <h4>{title}</h4>
+                    <p>{description}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            <aside className="help-action-tip">
+              <ShieldCheck size={18} aria-hidden="true" />
+              <p>
+                Check the task title before saving. To change its status, move
+                its card to another column.
+              </p>
+            </aside>
+          </article>
+
+          <article
+            className="help-action-card help-action-card--delete"
+            aria-labelledby="delete-task-title"
+          >
+            <header className="help-action-heading">
+              <span className="help-action-icon" aria-hidden="true">
+                <Trash2 size={20} />
+              </span>
+              <div>
+                <h3 id="delete-task-title">Delete a task</h3>
+                <p>Remove a task you no longer need.</p>
+              </div>
+            </header>
+
+            <ol className="help-action-steps">
+              {deleteSteps.map(({ title, description }, index) => (
+                <li className="help-action-step" key={title}>
+                  <span className="help-step-number" aria-hidden="true">
+                    {index + 1}
+                  </span>
+                  <div>
+                    <h4>{title}</h4>
+                    <p>{description}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            <aside className="help-action-warning">
+              <TriangleAlert size={18} aria-hidden="true" />
+              <p>
+                Deletion has no undo in this app and may be permanent. Before
+                confirming, double-check that you selected the right task.
+              </p>
+            </aside>
+            <p className="help-delete-tip">
+              <Search size={16} aria-hidden="true" />
+              If you are unsure, choose Cancel and review the task first.
+            </p>
+          </article>
+        </div>
       </section>
 
       <section className="help-fields-section" aria-labelledby="task-fields-title">
