@@ -72,6 +72,13 @@
   outline-offset: 2px;
 }
 
+@media (max-width: 1100px) {
+  .header-search-clear {
+    width: 44px;
+    height: 44px;
+  }
+}
+
 .header-actions {
   display: flex;
   align-items: center;

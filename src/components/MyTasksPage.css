@@ -307,6 +307,21 @@
   color: #a6e2bd;
 }
 
+@media (min-width: 760px) and (max-width: 1000px) {
+  .my-task-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .my-task-actions button,
+  .my-task-filter-field select,
+  .my-task-clear-filters {
+    min-height: 44px;
+  }
+}
+
 @media (max-width: 650px) {
   .my-tasks-heading-actions {
     width: 100%;

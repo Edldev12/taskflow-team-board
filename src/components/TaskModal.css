@@ -146,6 +146,18 @@
     padding: 20px;
   }
 
+  .task-modal .form-group input,
+  .task-modal .form-group textarea,
+  .task-modal .form-group select,
+  .task-modal .modal-close,
+  .task-modal .modal-actions button {
+    min-height: 44px;
+  }
+
+  .task-modal .modal-close {
+    width: 44px;
+  }
+
   .modal-header h2 {
     font-size: 18px;
   }
