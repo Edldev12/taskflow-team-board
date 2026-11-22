@@ -167,6 +167,11 @@ describe("dashboard task statistics", () => {
       screen.getByRole("heading", { name: "Keyboard Shortcuts" })
     ).toBeTruthy();
     expect(
+      screen.getByRole("heading", {
+        name: "Task Statuses and Priorities",
+      })
+    ).toBeTruthy();
+    expect(
       screen.getByRole("table", {
         name: "Keyboard controls available in TaskFlow",
       })

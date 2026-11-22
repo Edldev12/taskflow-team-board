@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import HelpDragDropGuide from "./HelpDragDropGuide";
 import KeyboardShortcutsSection from "./KeyboardShortcutsSection";
+import TaskStatusesPrioritiesSection from "./TaskStatusesPrioritiesSection";
 import "./HelpCenter.css";
 
 const creationSteps = [
@@ -241,6 +242,8 @@ function HelpCenter({ onReturnToDashboard }) {
       </section>
 
       <HelpDragDropGuide />
+
+      <TaskStatusesPrioritiesSection />
 
       <KeyboardShortcutsSection />
 
