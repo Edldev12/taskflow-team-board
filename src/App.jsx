@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Header from "./components/Header";
 import HelpCenter from "./components/HelpCenter";
 import TaskColumn from "./components/TaskColumn";
-import TaskProgressSection from "./components/TaskProgressSection";
+import YourProgressPage from "./components/YourProgressPage";
 import "./App.css";
 import TaskModal from "./components/TaskModal";
 
@@ -215,17 +215,16 @@ function App() {
 
         if (column.id === "done") {
           stats.completed += columnTaskCount;
-        } else if (column.id === "todo" || column.id === "in-progress") {
-          stats.pending += columnTaskCount;
         }
 
         return stats;
       },
-      { total: 0, completed: 0, pending: 0 }
+      { total: 0, completed: 0 }
     );
 
     return {
       ...counts,
+      pending: counts.total - counts.completed,
       completionPercentage:
         counts.total === 0
           ? 0
@@ -619,7 +618,12 @@ function App() {
 
           <div className="sidebar-divider"></div>
 
-          <a href="#your-progress" className="nav-link">
+          <a
+            href="#your-progress"
+            className={`nav-link${activePage === "progress" ? " active" : ""}`}
+            aria-current={activePage === "progress" ? "page" : undefined}
+            onClick={() => setActivePage("progress")}
+          >
             <span className="nav-icon">◷</span>
             Your Progress
           </a>
@@ -659,6 +663,13 @@ function App() {
 
         {activePage === "help" ? (
           <HelpCenter onReturnToDashboard={() => setActivePage("dashboard")} />
+        ) : activePage === "progress" ? (
+          <YourProgressPage
+            totalTasks={taskStats.total}
+            completedTasks={taskStats.completed}
+            pendingTasks={taskStats.pending}
+            completionPercentage={taskStats.completionPercentage}
+          />
         ) : (
           <section className="dashboard-content" id="dashboard">
           <div className="dashboard-heading">
@@ -681,13 +692,6 @@ function App() {
               <span>+</span> Add Task
             </button>
           </div>
-
-          <TaskProgressSection
-            totalTasks={taskStats.total}
-            completedTasks={taskStats.completed}
-            pendingTasks={taskStats.pending}
-            completionPercentage={taskStats.completionPercentage}
-          />
 
           {/*
           <div className="task-board">

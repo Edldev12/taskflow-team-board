@@ -14,6 +14,7 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
+import FaqSection from "./FaqSection";
 import HelpDragDropGuide from "./HelpDragDropGuide";
 import KeyboardShortcutsSection from "./KeyboardShortcutsSection";
 import TaskStatusesPrioritiesSection from "./TaskStatusesPrioritiesSection";
@@ -316,6 +317,8 @@ function HelpCenter({ onReturnToDashboard }) {
           </div>
         </aside>
       </div>
+
+      <FaqSection />
     </section>
   );
 }
