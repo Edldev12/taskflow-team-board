@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App";
 
@@ -408,6 +415,151 @@ describe("dashboard task statistics", () => {
       name: `${nextMonthLabel} calendar`,
     });
     expect(within(calendarTable).getAllByRole("cell")).toHaveLength(42);
+  });
+
+  it("assigns missing due dates by status and displays tasks on their saved dates", async () => {
+    const user = userEvent.setup();
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const firstDueDate = `${year}-${month}-15`;
+    const updatedDueDate = `${year}-${month}-16`;
+    const dateLabel = (day) =>
+      new Intl.DateTimeFormat(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }).format(new Date(year, now.getMonth(), day));
+    const userCreateTask = async (title, dueDate) => {
+      await user.click(screen.getByRole("button", { name: /add task/i }));
+      await user.type(screen.getByLabelText("Task Title *"), title);
+      if (dueDate) {
+        fireEvent.change(screen.getByLabelText(/Due date/), {
+          target: { value: dueDate },
+        });
+      }
+      await user.click(screen.getByRole("button", { name: "Create Task" }));
+    };
+
+    const { unmount } = render(<App />);
+    await userCreateTask("Due task one", firstDueDate);
+    await userCreateTask("Due task two", firstDueDate);
+    await userCreateTask("Due task three", firstDueDate);
+    await userCreateTask("Automatically dated task", "");
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+
+    const calendarTable = screen.getByRole("table", {
+      name: `${new Intl.DateTimeFormat(undefined, {
+        month: "long",
+        year: "numeric",
+      }).format(now)} calendar`,
+    });
+    const firstDateCell = within(calendarTable).getByRole("cell", {
+      name: dateLabel(15),
+    });
+    expect(within(firstDateCell).getByText("Due task one")).toBeTruthy();
+    expect(within(firstDateCell).getByText("Due task two")).toBeTruthy();
+    expect(within(firstDateCell).queryByText("Due task three")).toBeNull();
+    expect(within(firstDateCell).getByText("+ 1 more")).toBeTruthy();
+    expect(
+      firstDateCell.querySelector(".calendar-task--todo .calendar-task-priority--medium")
+    ).toBeTruthy();
+    const storedColumnsBeforeEdit = JSON.parse(
+      localStorage.getItem("taskflow-team-board.columns")
+    );
+    const allStoredTasks = storedColumnsBeforeEdit.flatMap(
+      (column) => column.tasks
+    );
+    expect(allStoredTasks.every((task) => /^\d{4}-\d{2}-\d{2}$/.test(task.dueDate))).toBe(
+      true
+    );
+
+    const getIsoDate = (date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const expectedInProgressDate = getIsoDate(now);
+    const yesterday = new Date(year, now.getMonth(), now.getDate() - 1);
+    const expectedDoneDate = getIsoDate(yesterday);
+    const todoTomorrow = new Date(year, now.getMonth(), now.getDate() + 1);
+    expect(
+      allStoredTasks.find((task) => task.title === "Build dashboard interface")
+        .dueDate
+    ).toBe(expectedInProgressDate);
+    expect(
+      allStoredTasks.find((task) => task.title === "Set up React project").dueDate
+    ).toBe(expectedDoneDate);
+    expect(
+      allStoredTasks.find((task) => task.title === "Design landing page").dueDate
+    ).toBe(getIsoDate(todoTomorrow));
+
+    const automaticallyDatedTask = allStoredTasks.find(
+      (task) => task.title === "Automatically dated task"
+    );
+    const automaticallyDatedDate = new Date(
+      `${automaticallyDatedTask.dueDate}T12:00:00`
+    );
+    const autoDateCell = within(calendarTable).getByRole("cell", {
+      name: new Intl.DateTimeFormat(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }).format(automaticallyDatedDate),
+    });
+    expect(
+      within(autoDateCell).getByText("Automatically dated task")
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole("link", { name: /Dashboard/ }));
+    await user.click(
+      screen.getByRole("button", { name: "Edit Due task one" })
+    );
+    fireEvent.change(screen.getByLabelText(/Due date/), {
+      target: { value: updatedDueDate },
+    });
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    const savedColumns = JSON.parse(
+      localStorage.getItem("taskflow-team-board.columns")
+    );
+    const updatedTask = savedColumns
+      .flatMap((column) => column.tasks)
+      .find((task) => task.title === "Due task one");
+    expect(updatedTask.dueDate).toBe(updatedDueDate);
+
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+    const updatedCell = within(
+      screen.getByRole("table", {
+        name: `${new Intl.DateTimeFormat(undefined, {
+          month: "long",
+          year: "numeric",
+        }).format(now)} calendar`,
+      })
+    ).getByRole("cell", { name: dateLabel(16) });
+    expect(within(updatedCell).getByText("Due task one")).toBeTruthy();
+
+    const oldCell = within(
+      screen.getByRole("table", {
+        name: `${new Intl.DateTimeFormat(undefined, {
+          month: "long",
+          year: "numeric",
+        }).format(now)} calendar`,
+      })
+    ).getByRole("cell", { name: dateLabel(15) });
+    expect(within(oldCell).queryByText("Due task one")).toBeNull();
+
+    unmount();
+    render(<App />);
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+    const restoredDateCell = within(
+      screen.getByRole("table", {
+        name: `${new Intl.DateTimeFormat(undefined, {
+          month: "long",
+          year: "numeric",
+        }).format(now)} calendar`,
+      })
+    ).getByRole("cell", { name: dateLabel(16) });
+    expect(within(restoredDateCell).getByText("Due task one")).toBeTruthy();
   });
 
   it("restores manual themes after refresh and keeps them across navigation", async () => {

@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { isValidDueDate } from "../utils/taskDates";
 import "./CalendarPage.css";
 
+const MAX_VISIBLE_TASKS_PER_DAY = 2;
+const taskStatusLabels = {
+  todo: "To Do",
+  "in-progress": "In Progress",
+  done: "Done",
+};
 const weekdays = [
   "Sunday",
   "Monday",
@@ -26,7 +33,7 @@ function getDateTimeValue(date) {
   return `${year}-${month}-${day}`;
 }
 
-function CalendarPage() {
+function CalendarPage({ columns }) {
   const [displayedMonth, setDisplayedMonth] = useState(
     () => new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   );
@@ -51,6 +58,24 @@ function CalendarPage() {
       return date;
     });
   }, [displayedMonth]);
+  const tasksByDueDate = useMemo(() => {
+    const tasks = new Map();
+
+    for (const column of columns) {
+      for (const task of column.tasks) {
+        if (!isValidDueDate(task.dueDate)) continue;
+
+        const dueDateTasks = tasks.get(task.dueDate) || [];
+        dueDateTasks.push(task);
+        tasks.set(task.dueDate, dueDateTasks);
+      }
+    }
+
+    return tasks;
+  }, [columns]);
+  const hasVisibleDueTasks = dates.some((date) =>
+    tasksByDueDate.has(getDateTimeValue(date))
+  );
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -109,7 +134,7 @@ function CalendarPage() {
 
         <div className="calendar-table-wrapper">
           <table
-            className="calendar-table"
+            className={`calendar-table${hasVisibleDueTasks ? " has-due-tasks" : ""}`}
             aria-label={`${monthLabel} calendar`}
           >
             <thead>
@@ -142,6 +167,15 @@ function CalendarPage() {
                         day: "numeric",
                         year: "numeric",
                       }).format(date);
+                      const dateTimeValue = getDateTimeValue(date);
+                      const dueDateTasks = tasksByDueDate.get(dateTimeValue) || [];
+                      const visibleTasks = dueDateTasks.slice(
+                        0,
+                        MAX_VISIBLE_TASKS_PER_DAY
+                      );
+                      const remainingTasks = dueDateTasks.slice(
+                        MAX_VISIBLE_TASKS_PER_DAY
+                      );
 
                       return (
                         <td
@@ -159,6 +193,51 @@ function CalendarPage() {
                           <time dateTime={getDateTimeValue(date)}>
                             {date.getDate()}
                           </time>
+                          {dueDateTasks.length > 0 && (
+                            <ul
+                              className="calendar-task-list"
+                              aria-label={`Tasks due ${accessibleDate}`}
+                            >
+                              {visibleTasks.map((task) => {
+                                const status = task.status || "todo";
+                                const priority = task.priority.toLowerCase();
+                                const statusLabel =
+                                  taskStatusLabels[status] || "To Do";
+
+                                return (
+                                  <li
+                                    className={`calendar-task calendar-task--${status}`}
+                                    aria-label={`${task.title}, ${statusLabel}, ${task.priority} priority`}
+                                    key={task.id}
+                                    title={`${task.title} - ${statusLabel} - ${task.priority} priority`}
+                                  >
+                                    <span className="calendar-task-title">
+                                      {task.title}
+                                    </span>
+                                    <span
+                                      className={`calendar-task-priority calendar-task-priority--${priority}`}
+                                      aria-hidden="true"
+                                    />
+                                  </li>
+                                );
+                              })}
+                              {remainingTasks.length > 0 && (
+                                <li
+                                  className="calendar-task-more"
+                                  aria-label={`${
+                                    remainingTasks.length
+                                  } more tasks: ${remainingTasks
+                                    .map((task) => task.title)
+                                    .join(", ")}`}
+                                  title={remainingTasks
+                                    .map((task) => task.title)
+                                    .join(", ")}
+                                >
+                                  + {remainingTasks.length} more
+                                </li>
+                              )}
+                            </ul>
+                          )}
                         </td>
                       );
                     })}

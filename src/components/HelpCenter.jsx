@@ -37,7 +37,7 @@ const creationSteps = [
     icon: Flag,
     title: "Choose priority and label",
     description:
-      "Select High, Medium, or Low priority. Add an optional label by typing a name such as Design or Planning.",
+      "A To Do task gets a date in the next 7 days; undated In Progress tasks get today, and undated Done tasks get yesterday. You can change the date, choose a priority, and add an optional label.",
   },
   {
     icon: CircleCheck,
@@ -61,7 +61,7 @@ const editSteps = [
   {
     title: "Update its details",
     description:
-      "Change the title, description, priority, or label. Status is not edited in this form; move the task between board columns instead.",
+      "Change the title, description, due date, priority, or label. Status is not edited in this form; move the task between board columns instead.",
   },
   {
     title: "Save or cancel",

@@ -13,6 +13,11 @@ import {
   saveApplicationPreferences,
 } from "./utils/applicationPreferencesStorage";
 import { loadProfile, saveProfile } from "./utils/profileStorage";
+import {
+  assignMissingDueDates,
+  getStatusBasedDueDate,
+  isValidDueDate,
+} from "./utils/taskDates";
 
 const taskColumns = [
   {
@@ -116,7 +121,7 @@ function loadTaskColumns() {
   try {
     const savedColumns = window.localStorage.getItem(TASK_COLUMNS_STORAGE_KEY);
     if (savedColumns === null) {
-      return taskColumns;
+      return assignMissingDueDates(taskColumns);
     }
 
     const parsedColumns = JSON.parse(savedColumns);
@@ -141,12 +146,19 @@ function loadTaskColumns() {
             (typeof task.id !== "string" && typeof task.id !== "number") ||
             typeof task.title !== "string" ||
             typeof task.label !== "string" ||
-            typeof task.priority !== "string"
+            typeof task.priority !== "string" ||
+            (task.dueDate != null &&
+              task.dueDate !== "" &&
+              !isValidDueDate(task.dueDate))
           ) {
             throw new Error(`A saved task in "${column.id}" is invalid.`);
           }
 
-          return { ...task, status: column.id };
+          return {
+            ...task,
+            dueDate: task.dueDate ?? "",
+            status: column.id,
+          };
         }),
       };
     });
@@ -162,10 +174,10 @@ function loadTaskColumns() {
       }
     }
 
-    return restoredColumns;
+    return assignMissingDueDates(restoredColumns);
   } catch (error) {
     console.error("Unable to restore the saved task board.", error);
-    return taskColumns;
+    return assignMissingDueDates(taskColumns);
   }
 }
 
@@ -270,6 +282,7 @@ function App() {
   );
   const [activePage, setActivePage] = useState("dashboard");
   const [columns, setColumns] = useState(loadTaskColumns);
+  const [defaultTaskDueDate, setDefaultTaskDueDate] = useState("");
   const [notifications, setNotifications] = useState(loadNotifications);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
@@ -483,6 +496,11 @@ function App() {
   function openCreateModal() {
     returnFocusRef.current = triggerRef.current;
     setSelectedTask(null);
+    const todoTaskCount =
+      columns.find((column) => column.id === "todo")?.tasks.length || 0;
+    setDefaultTaskDueDate(
+      getStatusBasedDueDate("todo", todoTaskCount)
+    );
     setIsModalOpen(true);
   }
 
@@ -515,6 +533,12 @@ function App() {
       const newTask = {
         id: crypto.randomUUID(),
         ...taskData,
+        dueDate:
+          taskData.dueDate ||
+          getStatusBasedDueDate(
+            "todo",
+            columns.find((column) => column.id === "todo")?.tasks.length || 0
+          ),
         status: "todo",
       };
 
@@ -896,7 +920,7 @@ function App() {
             completionPercentage={taskStats.completionPercentage}
           />
         ) : activePage === "calendar" ? (
-          <CalendarPage />
+          <CalendarPage columns={columns} />
         ) : (
           <section className="dashboard-content" id="dashboard">
           <div className="dashboard-heading">
@@ -987,6 +1011,7 @@ function App() {
             onClose={closeModal}
             onSave={saveTask}
             task={selectedTask}
+            defaultDueDate={defaultTaskDueDate}
             returnFocusRef={returnFocusRef}
           />
         )}
