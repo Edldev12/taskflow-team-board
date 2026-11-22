@@ -5,6 +5,12 @@
   color: var(--text);
 }
 
+.app-layout * {
+  transition-property: background-color, color, border-color;
+  transition-duration: 180ms;
+  transition-timing-function: ease;
+}
+
 /* Sidebar */
 .sidebar {
   width: 245px;
@@ -110,33 +116,6 @@
   padding-top: 25px;
 }
 
-.theme-switch {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px;
-  margin-bottom: 22px;
-  border-radius: 12px;
-  background: var(--background);
-}
-
-.theme-option {
-  flex: 1;
-  padding: 9px 5px;
-  border: none;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.theme-option.selected {
-  background: #72b7f5;
-  color: #102b45;
-  font-weight: 650;
-}
-
 .sidebar-profile {
   display: flex;
   align-items: center;
@@ -159,6 +138,12 @@
 .sidebar-profile-info span {
   color: var(--muted);
   font-size: 11px;
+}
+
+.sidebar-profile-info strong,
+.sidebar-profile-info span {
+  max-width: 145px;
+  overflow-wrap: anywhere;
 }
 
 /* Main dashboard */
@@ -342,7 +327,8 @@
   background: #edf4fb;
   border: 1px solid #e1eaf3;
   border-radius: 13px;
-  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+  transition: border-color 180ms ease, box-shadow 150ms ease,
+    background 180ms ease, color 180ms ease;
 }
 
 .task-column.is-drop-target {
@@ -424,7 +410,8 @@
   border-radius: 10px;
   box-shadow: 0 2px 5px rgba(38, 55, 74, 0.035);
   cursor: grab;
-  transition: opacity 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  transition: opacity 150ms ease, box-shadow 150ms ease, transform 150ms ease,
+    background-color 180ms ease, color 180ms ease, border-color 180ms ease;
 }
 
 .task-card:active {
@@ -517,6 +504,7 @@
   --text: #edf3fa;
   --muted: #a6b4c5;
   --border: #35465b;
+  color-scheme: dark;
 }
 
 .app-layout[data-theme="dark"] .sidebar,
@@ -532,6 +520,11 @@
 }
 
 .app-layout[data-theme="dark"] .brand-icon {
+  background: #30465e;
+  color: #9bcfff;
+}
+
+.app-layout[data-theme="dark"] .profile-avatar {
   background: #30465e;
   color: #9bcfff;
 }
@@ -585,15 +578,6 @@
   color: #a6e2bd;
 }
 
-.app-layout[data-theme="dark"] .theme-switch {
-  background: #172333;
-}
-
-.app-layout[data-theme="dark"] .theme-option.selected {
-  background: #72b7f5;
-  color: #102b45;
-}
-
 /*======================================================*/
 .task-description {
   margin: 8px 0;
@@ -607,6 +591,27 @@
   justify-content: flex-end;
   gap: 8px;
   margin-top: 14px;
+}
+
+.app-layout[data-task-density="compact"] .task-column {
+  padding: 12px;
+}
+
+.app-layout[data-task-density="compact"] .column-tasks {
+  gap: 7px;
+}
+
+.app-layout[data-task-density="compact"] .task-card {
+  padding: 11px;
+}
+
+.app-layout[data-task-density="compact"] .task-card h3 {
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.app-layout[data-task-density="compact"] .task-card-actions {
+  margin-top: 9px;
 }
 
 .task-card-actions button {
@@ -624,6 +629,10 @@
 
 .task-delete-button {
   color: #dc5145;
+}
+
+.app-layout[data-theme="dark"] .task-delete-button {
+  color: #ffb5a9;
 }
 
 .task-card-actions button:hover {
@@ -761,11 +770,6 @@
     padding-top: 12px;
   }
 
-  .theme-switch {
-    width: 165px;
-    margin: 0;
-  }
-
   .sidebar-profile {
     padding: 0;
     border: none;
@@ -828,6 +832,16 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+.app-layout[data-motion-preference="reduced"],
+.app-layout[data-motion-preference="reduced"] *,
+.app-layout[data-motion-preference="reduced"] *::before,
+.app-layout[data-motion-preference="reduced"] *::after {
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
 }
 
 @media (max-width: 650px) {

@@ -1,11 +1,18 @@
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import CalendarPage from "./components/CalendarPage";
 import Header from "./components/Header";
 import HelpCenter from "./components/HelpCenter";
+import SettingsPage from "./components/SettingsPage";
 import TaskColumn from "./components/TaskColumn";
 import YourProgressPage from "./components/YourProgressPage";
 import "./App.css";
 import TaskModal from "./components/TaskModal";
+import {
+  loadApplicationPreferences,
+  saveApplicationPreferences,
+} from "./utils/applicationPreferencesStorage";
+import { loadProfile, saveProfile } from "./utils/profileStorage";
 
 const taskColumns = [
   {
@@ -42,6 +49,68 @@ const taskColumns = [
 ];
 
 const TASK_COLUMNS_STORAGE_KEY = "taskflow-team-board.columns";
+const NOTIFICATIONS_STORAGE_KEY = "taskflow-team-board.notifications";
+const THEME_PREFERENCE_STORAGE_KEY =
+  document.documentElement.dataset.themeStorageKey ||
+  "taskflow-team-board.theme";
+
+function loadNotifications() {
+  try {
+    const savedNotifications = window.localStorage.getItem(
+      NOTIFICATIONS_STORAGE_KEY
+    );
+    if (savedNotifications === null) return [];
+
+    const parsedNotifications = JSON.parse(savedNotifications);
+    if (
+      !Array.isArray(parsedNotifications) ||
+      parsedNotifications.some(
+        (notification) =>
+          !notification ||
+          typeof notification.id !== "string" ||
+          typeof notification.message !== "string" ||
+          typeof notification.createdAt !== "string" ||
+          !Number.isFinite(Date.parse(notification.createdAt)) ||
+          typeof notification.read !== "boolean"
+      )
+    ) {
+      throw new Error("Saved notifications are invalid.");
+    }
+
+    return parsedNotifications.slice(0, 20);
+  } catch (error) {
+    console.error("Unable to restore saved notifications.", error);
+    return [];
+  }
+}
+
+function loadThemePreference() {
+  const bootPreference = document.documentElement.dataset.themePreference;
+  if (
+    bootPreference === "light" ||
+    bootPreference === "dark" ||
+    bootPreference === "system"
+  ) {
+    return bootPreference;
+  }
+
+  try {
+    const preference = window.localStorage.getItem(THEME_PREFERENCE_STORAGE_KEY);
+    return preference === "light" || preference === "dark"
+      ? preference
+      : "system";
+  } catch (error) {
+    console.error("Unable to restore the saved theme preference.", error);
+    return "system";
+  }
+}
+
+function getSystemTheme() {
+  return typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
 
 function loadTaskColumns() {
   try {
@@ -192,9 +261,16 @@ function getTaskMovementAnnouncement(previousColumns, nextColumns, taskId) {
 }
 
 function App() {
-  const [theme, setTheme] = useState("light");
+  const [themePreference, setThemePreference] = useState(loadThemePreference);
+  const [systemTheme, setSystemTheme] = useState(getSystemTheme);
+  const theme = themePreference === "system" ? systemTheme : themePreference;
+  const [profile, setProfile] = useState(loadProfile);
+  const [applicationPreferences, setApplicationPreferences] = useState(
+    loadApplicationPreferences
+  );
   const [activePage, setActivePage] = useState("dashboard");
   const [columns, setColumns] = useState(loadTaskColumns);
+  const [notifications, setNotifications] = useState(loadNotifications);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dropTargetColumnId, setDropTargetColumnId] = useState(null);
@@ -232,6 +308,60 @@ function App() {
     };
   }, [columns]);
 
+  useLayoutEffect(() => {
+    const rootElement = document.documentElement;
+    rootElement.dataset.theme = theme;
+    rootElement.dataset.themePreference = themePreference;
+    return () => {
+      delete rootElement.dataset.theme;
+      delete rootElement.dataset.themePreference;
+    };
+  }, [theme, themePreference]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)");
+    if (!mediaQuery) return undefined;
+
+    const handleSystemThemeChange = (event) => {
+      setSystemTheme(event.matches ? "dark" : "light");
+    };
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleSystemThemeChange);
+      return () =>
+        mediaQuery.removeEventListener("change", handleSystemThemeChange);
+    }
+
+    mediaQuery.addListener(handleSystemThemeChange);
+    return () => mediaQuery.removeListener(handleSystemThemeChange);
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (themePreference === "system") {
+        window.localStorage.removeItem(THEME_PREFERENCE_STORAGE_KEY);
+      } else {
+        window.localStorage.setItem(
+          THEME_PREFERENCE_STORAGE_KEY,
+          themePreference
+        );
+      }
+    } catch (error) {
+      console.error("Unable to save the theme preference.", error);
+    }
+  }, [themePreference]);
+
+  useEffect(() => {
+    const rootElement = document.documentElement;
+    if (applicationPreferences.motionPreference === "reduced") {
+      rootElement.setAttribute("data-app-motion", "reduced");
+    } else {
+      rootElement.removeAttribute("data-app-motion");
+    }
+
+    return () => rootElement.removeAttribute("data-app-motion");
+  }, [applicationPreferences.motionPreference]);
+
   useEffect(() => {
     if (!taskAnnouncement) return;
 
@@ -254,6 +384,17 @@ function App() {
   }, [columns]);
 
   useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        NOTIFICATIONS_STORAGE_KEY,
+        JSON.stringify(notifications)
+      );
+    } catch (error) {
+      console.error("Unable to save notifications.", error);
+    }
+  }, [notifications]);
+
+  useEffect(() => {
     if (pendingKeyboardFocusTaskId.current === null) return;
 
     const taskId = String(pendingKeyboardFocusTaskId.current);
@@ -262,7 +403,59 @@ function App() {
   }, [columns]);
 
   function toggleTheme(selectedTheme) {
-    setTheme(selectedTheme);
+    setThemePreference(selectedTheme);
+  }
+
+  function handleSaveProfile(nextProfile) {
+    if (!saveProfile(nextProfile)) return false;
+    setProfile(nextProfile);
+    return true;
+  }
+
+  function handleApplicationPreferencesChange(nextPreferences) {
+    if (!saveApplicationPreferences(nextPreferences)) return false;
+    setApplicationPreferences(nextPreferences);
+    return true;
+  }
+
+  function addNotification(message) {
+    setNotifications((previousNotifications) => [
+      {
+        id: crypto.randomUUID(),
+        message,
+        createdAt: new Date().toISOString(),
+        read: false,
+      },
+      ...previousNotifications,
+    ].slice(0, 20));
+  }
+
+  function markNotificationsRead() {
+    setNotifications((previousNotifications) =>
+      previousNotifications.map((notification) =>
+        notification.read ? notification : { ...notification, read: true }
+      )
+    );
+  }
+
+  function recordTaskStatusChange(previousColumns, nextColumns, taskId) {
+    const previousColumn = previousColumns.find((column) =>
+      column.tasks.some((task) => String(task.id) === String(taskId))
+    );
+    const nextColumn = nextColumns.find((column) =>
+      column.tasks.some((task) => String(task.id) === String(taskId))
+    );
+
+    if (!previousColumn || !nextColumn || previousColumn.id === nextColumn.id) {
+      return;
+    }
+
+    const task = previousColumn.tasks.find(
+      (item) => String(item.id) === String(taskId)
+    );
+    addNotification(
+      `${task.title} moved from ${previousColumn.title} to ${nextColumn.title}.`
+    );
   }
 
   function announceTaskMovement(previousColumns, nextColumns, taskId) {
@@ -306,7 +499,7 @@ function App() {
 
   function saveTask(taskData) {
     if (selectedTask) {
-      // Update existing task
+      addNotification(`Task updated: ${taskData.title}.`);
       setColumns((previousColumns) =>
         previousColumns.map((column) => ({
           ...column,
@@ -325,6 +518,7 @@ function App() {
         status: "todo",
       };
 
+      addNotification(`Task created: ${newTask.title}.`);
       setColumns((previousColumns) =>
         previousColumns.map((column) =>
           column.id === "todo"
@@ -343,6 +537,13 @@ function App() {
     );
 
     if (!confirmed) return;
+
+    const deletedTask = columns
+      .flatMap((column) => column.tasks)
+      .find((task) => task.id === taskId);
+    if (deletedTask) {
+      addNotification(`Task deleted: ${deletedTask.title}.`);
+    }
 
     setColumns((previousColumns) =>
       previousColumns.map((column) => ({
@@ -437,6 +638,7 @@ function App() {
           if (nextColumns !== columns) {
             setColumns(nextColumns);
             announceTaskMovement(columns, nextColumns, taskId);
+            recordTaskStatusChange(columns, nextColumns, taskId);
           }
         }
       }
@@ -497,6 +699,7 @@ function App() {
         pendingKeyboardFocusTaskId.current = keyboardMove.taskId;
         setColumns(nextColumns);
         announceTaskMovement(columns, nextColumns, keyboardMove.taskId);
+        recordTaskStatusChange(columns, nextColumns, keyboardMove.taskId);
       }
 
       setKeyboardMove(null);
@@ -568,7 +771,14 @@ function App() {
   }
 
   return (
-    <div className="app-layout" data-theme={theme}>
+    <div
+      className="app-layout"
+      data-theme={theme}
+      data-motion-preference={applicationPreferences.motionPreference}
+      data-task-density={
+        applicationPreferences.compactTaskCards ? "compact" : "comfortable"
+      }
+    >
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-icon">✓</div>
@@ -596,12 +806,22 @@ function App() {
             My Tasks
           </a>
 
-          <a href="#calendar" className="nav-link">
+          <a
+            href="#calendar"
+            className={`nav-link${activePage === "calendar" ? " active" : ""}`}
+            aria-current={activePage === "calendar" ? "page" : undefined}
+            onClick={() => setActivePage("calendar")}
+          >
             <span className="nav-icon">▣</span>
             Calendar
           </a>
 
-          <a href="#settings" className="nav-link">
+          <a
+            href="#settings"
+            className={`nav-link${activePage === "settings" ? " active" : ""}`}
+            aria-current={activePage === "settings" ? "page" : undefined}
+            onClick={() => setActivePage("settings")}
+          >
             <span className="nav-icon">⚙</span>
             Settings
           </a>
@@ -630,39 +850,44 @@ function App() {
         </nav>
 
         <div className="sidebar-bottom">
-          <div className="theme-switch">
-            <button
-              className={theme === "light" ? "theme-option selected" : "theme-option"}
-              onClick={() => toggleTheme("light")}
-              aria-pressed={theme === "light"}
-            >
-              ☀ Light
-            </button>
-
-            <button
-              className={theme === "dark" ? "theme-option selected" : "theme-option"}
-              onClick={() => toggleTheme("dark")}
-              aria-pressed={theme === "dark"}
-            >
-              ☾ Dark
-            </button>
-          </div>
-
           <div className="sidebar-profile">
-            <div className="profile-avatar">WK</div>
+            <div
+              className="profile-avatar"
+              role="img"
+              aria-label={`${profile.initials} profile initials`}
+            >
+              {profile.initials}
+            </div>
             <div className="sidebar-profile-info">
-              <strong>Weynshet</strong>
-              <span>Team Member</span>
+              <strong>{profile.fullName}</strong>
             </div>
           </div>
         </div>
       </aside>
 
       <main className="main-layout">
-        <Header />
+        <Header
+          profile={profile}
+          theme={theme}
+          onThemeChange={toggleTheme}
+          notifications={notifications}
+          onNotificationsRead={markNotificationsRead}
+        />
 
         {activePage === "help" ? (
           <HelpCenter onReturnToDashboard={() => setActivePage("dashboard")} />
+        ) : activePage === "settings" ? (
+          <SettingsPage
+            theme={theme}
+            themePreference={themePreference}
+            onThemePreferenceChange={setThemePreference}
+            profile={profile}
+            onSaveProfile={handleSaveProfile}
+            applicationPreferences={applicationPreferences}
+            onApplicationPreferencesChange={
+              handleApplicationPreferencesChange
+            }
+          />
         ) : activePage === "progress" ? (
           <YourProgressPage
             totalTasks={taskStats.total}
@@ -670,6 +895,8 @@ function App() {
             pendingTasks={taskStats.pending}
             completionPercentage={taskStats.completionPercentage}
           />
+        ) : activePage === "calendar" ? (
+          <CalendarPage />
         ) : (
           <section className="dashboard-content" id="dashboard">
           <div className="dashboard-heading">

@@ -1,10 +1,37 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme-storage-key="taskflow-team-board.theme">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>taskflow-team-board</title>
+    <script>
+      (() => {
+        const root = document.documentElement;
+        const storedThemeKey = root.dataset.themeStorageKey;
+        let preference = "system";
+
+        try {
+          const storedTheme = window.localStorage.getItem(storedThemeKey);
+          if (storedTheme === "light" || storedTheme === "dark") {
+            preference = storedTheme;
+          }
+        } catch (error) {
+          console.error("Unable to read the saved theme during startup.", error);
+        }
+
+        const theme =
+          preference === "system" &&
+          typeof window.matchMedia === "function" &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : preference === "system"
+              ? "light"
+              : preference;
+        root.dataset.themePreference = preference;
+        root.dataset.theme = theme;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

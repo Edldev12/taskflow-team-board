@@ -259,6 +259,23 @@
   background: #304b3d;
 }
 
+.app-layout[data-theme="dark"] .help-dnd-column--todo h3,
+.app-layout[data-theme="dark"] .help-dnd-dropzone {
+  color: #b9dcff;
+}
+
+.app-layout[data-theme="dark"] .help-dnd-column--progress h3 {
+  color: #f5d28c;
+}
+
+.app-layout[data-theme="dark"] .help-dnd-column--done h3 {
+  color: #a6e2bd;
+}
+
+.app-layout[data-theme="dark"] .help-dnd-detail-heading svg {
+  color: #9bcfff;
+}
+
 .app-layout[data-theme="dark"] .help-dnd-feedback {
   border-color: #503b3b;
   background: #3a2c2d;
