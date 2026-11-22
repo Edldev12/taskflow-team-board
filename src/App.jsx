@@ -920,7 +920,11 @@ function App() {
             completionPercentage={taskStats.completionPercentage}
           />
         ) : activePage === "calendar" ? (
-          <CalendarPage columns={columns} />
+          <CalendarPage
+            columns={columns}
+            onEditTask={openEditModal}
+            isEditModalOpen={isModalOpen}
+          />
         ) : (
           <section className="dashboard-content" id="dashboard">
           <div className="dashboard-heading">

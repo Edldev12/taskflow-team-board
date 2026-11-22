@@ -613,6 +613,64 @@ describe("dashboard task statistics", () => {
     expect(within(restoredDateCell).getByText("Due task one")).toBeTruthy();
   });
 
+  it("opens calendar task details, reuses edit, and closes accessibly", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+
+    await user.click(
+      screen.getByRole("button", {
+        name: /Design landing page, To Do, High priority.*View task details/,
+      })
+    );
+
+    let details = screen.getByRole("dialog", {
+      name: "Design landing page",
+    });
+    expect(within(details).getByText("To Do")).toBeTruthy();
+    expect(within(details).getByText("High")).toBeTruthy();
+    expect(within(details).getByText("Design")).toBeTruthy();
+    expect(
+      within(details).getByText("No description provided.")
+    ).toBeTruthy();
+    expect(within(details).getByText("Due date").parentElement.textContent).not
+      .toContain("No due date");
+
+    await user.click(
+      within(details).getByRole("button", { name: "Edit Task" })
+    );
+    const editDialog = screen.getByRole("dialog", { name: "Edit Task" });
+    const titleInput = within(editDialog).getByLabelText("Task Title *");
+    await user.clear(titleInput);
+    await user.type(titleInput, "Updated from Calendar");
+    await user.click(
+      within(editDialog).getByRole("button", { name: "Save Changes" })
+    );
+
+    details = screen.getByRole("dialog", {
+      name: "Updated from Calendar",
+    });
+    expect(within(details).getByText("To Do")).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(
+      screen.queryByRole("dialog", { name: "Updated from Calendar" })
+    ).toBeNull();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: /Updated from Calendar, To Do, High priority.*View task details/,
+      })
+    );
+    fireEvent.mouseDown(
+      screen.getByRole("dialog", { name: "Updated from Calendar" })
+        .parentElement
+    );
+    expect(
+      screen.queryByRole("dialog", { name: "Updated from Calendar" })
+    ).toBeNull();
+  });
+
   it("moves today's highlight when the local date changes", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 10, 30, 23, 59, 30));

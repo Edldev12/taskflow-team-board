@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import CalendarTaskDetails from "./CalendarTaskDetails";
 import { isValidDueDate } from "../utils/taskDates";
 import "./CalendarPage.css";
 
@@ -33,13 +34,14 @@ function getDateTimeValue(date) {
   return `${year}-${month}-${day}`;
 }
 
-function CalendarPage({ columns }) {
+function CalendarPage({ columns, onEditTask, isEditModalOpen }) {
   const [displayedMonth, setDisplayedMonth] = useState(
     () => new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   );
   const [todayDate, setTodayDate] = useState(() =>
     getDateTimeValue(new Date())
   );
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
   const headingRef = useRef(null);
   const monthLabel = getMonthLabel(displayedMonth);
   const dates = useMemo(() => {
@@ -78,6 +80,12 @@ function CalendarPage({ columns }) {
   const hasVisibleDueTasks = dates.some((date) =>
     tasksByDueDate.has(getDateTimeValue(date))
   );
+  const selectedTask =
+    selectedTaskId === null
+      ? null
+      : columns
+        .flatMap((column) => column.tasks)
+        .find((task) => String(task.id) === String(selectedTaskId)) || null;
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -121,7 +129,12 @@ function CalendarPage({ columns }) {
     );
   }
 
+  const closeTaskDetails = useCallback(() => {
+    setSelectedTaskId(null);
+  }, []);
+
   return (
+    <>
     <section
       className="dashboard-content calendar-page"
       aria-labelledby="calendar-page-title"
@@ -238,19 +251,23 @@ function CalendarPage({ columns }) {
                                   taskStatusLabels[status] || "To Do";
 
                                 return (
-                                  <li
-                                    className={`calendar-task calendar-task--${status}`}
-                                    aria-label={`${task.title}, ${statusLabel}, ${task.priority} priority`}
-                                    key={task.id}
-                                    title={`${task.title} - ${statusLabel} - ${task.priority} priority`}
-                                  >
-                                    <span className="calendar-task-title">
-                                      {task.title}
-                                    </span>
-                                    <span
-                                      className={`calendar-task-priority calendar-task-priority--${priority}`}
-                                      aria-hidden="true"
-                                    />
+                                  <li key={task.id}>
+                                    <button
+                                      className={`calendar-task calendar-task--${status}`}
+                                      type="button"
+                                      aria-label={`${task.title}, ${statusLabel}, ${task.priority} priority, due ${dateTimeValue}. View task details`}
+                                      aria-haspopup="dialog"
+                                      onClick={() => setSelectedTaskId(task.id)}
+                                      title={`${task.title} - ${statusLabel} - ${task.priority} priority`}
+                                    >
+                                      <span className="calendar-task-title">
+                                        {task.title}
+                                      </span>
+                                      <span
+                                        className={`calendar-task-priority calendar-task-priority--${priority}`}
+                                        aria-hidden="true"
+                                      />
+                                    </button>
                                   </li>
                                 );
                               })}
@@ -281,6 +298,16 @@ function CalendarPage({ columns }) {
         </div>
       </section>
     </section>
+    {selectedTask && (
+      <CalendarTaskDetails
+        task={selectedTask}
+        onClose={closeTaskDetails}
+        onEdit={onEditTask}
+        isEditModalOpen={isEditModalOpen}
+        fallbackFocusRef={headingRef}
+      />
+    )}
+    </>
   );
 }
 
