@@ -1,7 +1,9 @@
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Header from "./components/Header";
+import HelpCenter from "./components/HelpCenter";
 import TaskColumn from "./components/TaskColumn";
+import TaskProgressSection from "./components/TaskProgressSection";
 import "./App.css";
 import TaskModal from "./components/TaskModal";
 
@@ -191,6 +193,7 @@ function getTaskMovementAnnouncement(previousColumns, nextColumns, taskId) {
 
 function App() {
   const [theme, setTheme] = useState("light");
+  const [activePage, setActivePage] = useState("dashboard");
   const [columns, setColumns] = useState(loadTaskColumns);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
@@ -204,6 +207,31 @@ function App() {
   const pendingKeyboardFocusTaskId = useRef(null);
   const lastTaskAnnouncementRef = useRef(null);
   const [selectedTask, setSelectedTask] = useState(null);
+  const taskStats = useMemo(() => {
+    const counts = columns.reduce(
+      (stats, column) => {
+        const columnTaskCount = column.tasks.length;
+        stats.total += columnTaskCount;
+
+        if (column.id === "done") {
+          stats.completed += columnTaskCount;
+        } else if (column.id === "todo" || column.id === "in-progress") {
+          stats.pending += columnTaskCount;
+        }
+
+        return stats;
+      },
+      { total: 0, completed: 0, pending: 0 }
+    );
+
+    return {
+      ...counts,
+      completionPercentage:
+        counts.total === 0
+          ? 0
+          : Math.round((counts.completed / counts.total) * 100),
+    };
+  }, [columns]);
 
   useEffect(() => {
     if (!taskAnnouncement) return;
@@ -554,7 +582,12 @@ function App() {
         <nav className="sidebar-nav">
           <span className="nav-section-label">WORKSPACE</span>
 
-          <a href="#dashboard" className="nav-link active">
+          <a
+            href="#dashboard"
+            className={`nav-link${activePage === "dashboard" ? " active" : ""}`}
+            aria-current={activePage === "dashboard" ? "page" : undefined}
+            onClick={() => setActivePage("dashboard")}
+          >
             <span className="nav-icon">▦</span>
             Dashboard
           </a>
@@ -574,7 +607,12 @@ function App() {
             Settings
           </a>
 
-          <a href="#help" className="nav-link">
+          <a
+            href="#help"
+            className={`nav-link${activePage === "help" ? " active" : ""}`}
+            aria-current={activePage === "help" ? "page" : undefined}
+            onClick={() => setActivePage("help")}
+          >
             <span className="nav-icon">?</span>
             Help
           </a>
@@ -619,7 +657,10 @@ function App() {
       <main className="main-layout">
         <Header />
 
-        <section className="dashboard-content" id="dashboard">
+        {activePage === "help" ? (
+          <HelpCenter onReturnToDashboard={() => setActivePage("dashboard")} />
+        ) : (
+          <section className="dashboard-content" id="dashboard">
           <div className="dashboard-heading">
             <div>
               <h1>My Tasks</h1>
@@ -640,6 +681,13 @@ function App() {
               <span>+</span> Add Task
             </button>
           </div>
+
+          <TaskProgressSection
+            totalTasks={taskStats.total}
+            completedTasks={taskStats.completed}
+            pendingTasks={taskStats.pending}
+            completionPercentage={taskStats.completionPercentage}
+          />
 
           {/*
           <div className="task-board">
@@ -700,7 +748,8 @@ function App() {
             </span>
             {taskAnnouncement}
           </div>
-        </section>
+          </section>
+        )}
         {isModalOpen && (
           <TaskModal
             isOpen={isModalOpen}
