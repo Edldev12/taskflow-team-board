@@ -1,5 +1,5 @@
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import CalendarPage from "./components/CalendarPage";
 import Header from "./components/Header";
 import HelpCenter from "./components/HelpCenter";
@@ -18,6 +18,18 @@ import {
   getStatusBasedDueDate,
   isValidDueDate,
 } from "./utils/taskDates";
+import {
+  createTask,
+  deleteTask as deleteTaskApi,
+  getTasks,
+  hydrateTasks,
+  updateTask,
+} from "./api/taskApi";
+import {
+  loadTasks,
+  saveTasks,
+  subscribeToTaskChanges,
+} from "./utils/taskStorage";
 
 const taskColumns = [
   {
@@ -53,7 +65,6 @@ const taskColumns = [
   },
 ];
 
-const TASK_COLUMNS_STORAGE_KEY = "taskflow-team-board.columns";
 const NOTIFICATIONS_STORAGE_KEY = "taskflow-team-board.notifications";
 const THEME_PREFERENCE_STORAGE_KEY =
   document.documentElement.dataset.themeStorageKey ||
@@ -64,9 +75,11 @@ function loadNotifications() {
     const savedNotifications = window.localStorage.getItem(
       NOTIFICATIONS_STORAGE_KEY
     );
+
     if (savedNotifications === null) return [];
 
     const parsedNotifications = JSON.parse(savedNotifications);
+
     if (
       !Array.isArray(parsedNotifications) ||
       parsedNotifications.some(
@@ -91,6 +104,7 @@ function loadNotifications() {
 
 function loadThemePreference() {
   const bootPreference = document.documentElement.dataset.themePreference;
+
   if (
     bootPreference === "light" ||
     bootPreference === "dark" ||
@@ -100,7 +114,10 @@ function loadThemePreference() {
   }
 
   try {
-    const preference = window.localStorage.getItem(THEME_PREFERENCE_STORAGE_KEY);
+    const preference = window.localStorage.getItem(
+      THEME_PREFERENCE_STORAGE_KEY
+    );
+
     return preference === "light" || preference === "dark"
       ? preference
       : "system";
@@ -117,74 +134,87 @@ function getSystemTheme() {
     : "light";
 }
 
+function normalizeTaskColumns(savedColumns) {
+  if (!Array.isArray(savedColumns)) {
+    throw new Error("Saved task columns are not a list.");
+  }
+
+  const restoredColumns = taskColumns.map((column) => {
+    const savedColumn = savedColumns.find(
+      (item) => item?.id === column.id
+    );
+
+    if (!savedColumn || !Array.isArray(savedColumn.tasks)) {
+      throw new Error(`Saved tasks for "${column.id}" are invalid.`);
+    }
+
+    return {
+      ...column,
+      tasks: savedColumn.tasks.map((task) => {
+        if (
+          !task ||
+          (typeof task.id !== "string" && typeof task.id !== "number") ||
+          typeof task.title !== "string" ||
+          typeof task.label !== "string" ||
+          typeof task.priority !== "string" ||
+          (task.dueDate != null &&
+            task.dueDate !== "" &&
+            !isValidDueDate(task.dueDate))
+        ) {
+          throw new Error(`A saved task in "${column.id}" is invalid.`);
+        }
+
+        return {
+          ...task,
+          dueDate: task.dueDate ?? "",
+          status: column.id,
+        };
+      }),
+    };
+  });
+
+  const taskIds = new Set();
+
+  for (const column of restoredColumns) {
+    for (const task of column.tasks) {
+      const taskId = String(task.id);
+
+      if (taskIds.has(taskId)) {
+        throw new Error(`Saved task ID "${taskId}" appears more than once.`);
+      }
+
+      taskIds.add(taskId);
+    }
+  }
+
+  return assignMissingDueDates(restoredColumns);
+}
+
 function loadTaskColumns() {
   try {
-    const savedColumns = window.localStorage.getItem(TASK_COLUMNS_STORAGE_KEY);
+    const savedColumns = loadTasks();
+
     if (savedColumns === null) {
       return assignMissingDueDates(taskColumns);
     }
 
-    const parsedColumns = JSON.parse(savedColumns);
-    if (!Array.isArray(parsedColumns)) {
-      throw new Error("Saved task columns are not a list.");
-    }
-
-    const restoredColumns = taskColumns.map((column) => {
-      const savedColumn = parsedColumns.find(
-        (item) => item?.id === column.id
-      );
-
-      if (!savedColumn || !Array.isArray(savedColumn.tasks)) {
-        throw new Error(`Saved tasks for "${column.id}" are invalid.`);
-      }
-
-      return {
-        ...column,
-        tasks: savedColumn.tasks.map((task) => {
-          if (
-            !task ||
-            (typeof task.id !== "string" && typeof task.id !== "number") ||
-            typeof task.title !== "string" ||
-            typeof task.label !== "string" ||
-            typeof task.priority !== "string" ||
-            (task.dueDate != null &&
-              task.dueDate !== "" &&
-              !isValidDueDate(task.dueDate))
-          ) {
-            throw new Error(`A saved task in "${column.id}" is invalid.`);
-          }
-
-          return {
-            ...task,
-            dueDate: task.dueDate ?? "",
-            status: column.id,
-          };
-        }),
-      };
-    });
-
-    const taskIds = new Set();
-    for (const column of restoredColumns) {
-      for (const task of column.tasks) {
-        const taskId = String(task.id);
-        if (taskIds.has(taskId)) {
-          throw new Error(`Saved task ID "${taskId}" appears more than once.`);
-        }
-        taskIds.add(taskId);
-      }
-    }
-
-    return assignMissingDueDates(restoredColumns);
+    return normalizeTaskColumns(savedColumns);
   } catch (error) {
     console.error("Unable to restore the saved task board.", error);
     return assignMissingDueDates(taskColumns);
   }
 }
 
-function moveTaskToPosition(previousColumns, taskId, destinationColumnId, insertionIndex) {
+function moveTaskToPosition(
+  previousColumns,
+  taskId,
+  destinationColumnId,
+  insertionIndex
+) {
   const sourceColumnIndex = previousColumns.findIndex((column) =>
     column.tasks.some((task) => String(task.id) === String(taskId))
   );
+
   const destinationColumnIndex = previousColumns.findIndex(
     (column) => column.id === destinationColumnId
   );
@@ -194,15 +224,21 @@ function moveTaskToPosition(previousColumns, taskId, destinationColumnId, insert
   }
 
   const sourceColumn = previousColumns[sourceColumnIndex];
+
   const task = sourceColumn.tasks.find(
     (item) => String(item.id) === String(taskId)
   );
+
   const sourceTasks = sourceColumn.tasks.filter(
     (item) => String(item.id) !== String(taskId)
   );
 
   if (sourceColumnIndex === destinationColumnIndex) {
-    const position = Math.max(0, Math.min(insertionIndex, sourceTasks.length));
+    const position = Math.max(
+      0,
+      Math.min(insertionIndex, sourceTasks.length)
+    );
+
     const reorderedTasks = [...sourceTasks];
     reorderedTasks.splice(position, 0, task);
 
@@ -223,7 +259,12 @@ function moveTaskToPosition(previousColumns, taskId, destinationColumnId, insert
 
   const destinationColumn = previousColumns[destinationColumnIndex];
   const destinationTasks = [...destinationColumn.tasks];
-  const position = Math.max(0, Math.min(insertionIndex, destinationTasks.length));
+
+  const position = Math.max(
+    0,
+    Math.min(insertionIndex, destinationTasks.length)
+  );
+
   destinationTasks.splice(position, 0, {
     ...task,
     status: destinationColumn.id,
@@ -246,6 +287,7 @@ function getTaskMovementAnnouncement(previousColumns, nextColumns, taskId) {
   const sourceColumn = previousColumns.find((column) =>
     column.tasks.some((task) => String(task.id) === String(taskId))
   );
+
   const destinationColumn = nextColumns.find((column) =>
     column.tasks.some((task) => String(task.id) === String(taskId))
   );
@@ -263,6 +305,7 @@ function getTaskMovementAnnouncement(previousColumns, nextColumns, taskId) {
   const previousPosition = sourceColumn.tasks.findIndex(
     (item) => String(item.id) === String(taskId)
   );
+
   const newPosition = destinationColumn.tasks.findIndex(
     (item) => String(item.id) === String(taskId)
   );
@@ -275,27 +318,43 @@ function getTaskMovementAnnouncement(previousColumns, nextColumns, taskId) {
 function App() {
   const [themePreference, setThemePreference] = useState(loadThemePreference);
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
+
   const theme = themePreference === "system" ? systemTheme : themePreference;
+
   const [profile, setProfile] = useState(loadProfile);
+
   const [applicationPreferences, setApplicationPreferences] = useState(
     loadApplicationPreferences
   );
+
   const [activePage, setActivePage] = useState("dashboard");
   const [columns, setColumns] = useState(loadTaskColumns);
+  const [initialSavedColumns] = useState(loadTasks);
+
   const [defaultTaskDueDate, setDefaultTaskDueDate] = useState("");
   const [notifications, setNotifications] = useState(loadNotifications);
+
+  const [isTasksLoading, setIsTasksLoading] = useState(true);
+  const [taskLoadError, setTaskLoadError] = useState("");
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dropTargetColumnId, setDropTargetColumnId] = useState(null);
   const [dropIndicator, setDropIndicator] = useState(null);
   const [keyboardMove, setKeyboardMove] = useState(null);
   const [taskAnnouncement, setTaskAnnouncement] = useState("");
+
   const triggerRef = useRef(null);
   const returnFocusRef = useRef(null);
   const taskCardRefs = useRef(new Map());
   const pendingKeyboardFocusTaskId = useRef(null);
   const lastTaskAnnouncementRef = useRef(null);
+
+  const skipNextSaveRef = useRef(false);
+  const loadRequestRef = useRef(0);
+
   const [selectedTask, setSelectedTask] = useState(null);
+
   const taskStats = useMemo(() => {
     const counts = columns.reduce(
       (stats, column) => {
@@ -321,10 +380,59 @@ function App() {
     };
   }, [columns]);
 
+  const loadBoardTasks = useCallback(async () => {
+    const requestId = ++loadRequestRef.current;
+
+    setIsTasksLoading(true);
+    setTaskLoadError("");
+
+    try {
+      const columnsToHydrate =
+        initialSavedColumns !== null
+          ? normalizeTaskColumns(initialSavedColumns)
+          : assignMissingDueDates(taskColumns);
+
+      hydrateTasks(
+        columnsToHydrate.flatMap((column) => column.tasks)
+      );
+
+      const apiTasks = await getTasks();
+
+      if (requestId !== loadRequestRef.current) return;
+
+      const updatedColumns = taskColumns.map((column) => ({
+        ...column,
+        tasks: apiTasks
+          .filter((task) => task.status === column.id)
+          .map((task) => ({
+            ...task,
+            dueDate: task.dueDate ?? "",
+          })),
+      }));
+
+      setColumns(assignMissingDueDates(updatedColumns));
+      setTaskLoadError("");
+    } catch (error) {
+      if (requestId !== loadRequestRef.current) return;
+
+      console.error("Unable to load tasks from the mock API.", error);
+
+      setTaskLoadError(
+        error.message || "Unable to load tasks. Please try again."
+      );
+    } finally {
+      if (requestId === loadRequestRef.current) {
+        setIsTasksLoading(false);
+      }
+    }
+  }, [initialSavedColumns]);
+
   useLayoutEffect(() => {
     const rootElement = document.documentElement;
+
     rootElement.dataset.theme = theme;
     rootElement.dataset.themePreference = themePreference;
+
     return () => {
       delete rootElement.dataset.theme;
       delete rootElement.dataset.themePreference;
@@ -332,7 +440,50 @@ function App() {
   }, [theme, themePreference]);
 
   useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      loadBoardTasks();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      loadRequestRef.current += 1;
+    };
+  }, [loadBoardTasks]);
+
+  useEffect(() => {
+    if (isTasksLoading) return undefined;
+
+    const unsubscribe = subscribeToTaskChanges((updatedColumns) => {
+      try {
+        const normalizedColumns = normalizeTaskColumns(updatedColumns);
+
+        skipNextSaveRef.current = true;
+
+        hydrateTasks(
+          normalizedColumns.flatMap((column) => column.tasks)
+        );
+
+        setColumns(normalizedColumns);
+      } catch (error) {
+        console.error("Unable to apply synchronized task changes.", error);
+      }
+    });
+
+    return unsubscribe;
+  }, [isTasksLoading]);
+
+  useEffect(() => {
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
+
+    saveTasks(columns);
+  }, [columns]);
+
+  useEffect(() => {
     const mediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)");
+
     if (!mediaQuery) return undefined;
 
     const handleSystemThemeChange = (event) => {
@@ -341,11 +492,13 @@ function App() {
 
     if (typeof mediaQuery.addEventListener === "function") {
       mediaQuery.addEventListener("change", handleSystemThemeChange);
+
       return () =>
         mediaQuery.removeEventListener("change", handleSystemThemeChange);
     }
 
     mediaQuery.addListener(handleSystemThemeChange);
+
     return () => mediaQuery.removeListener(handleSystemThemeChange);
   }, []);
 
@@ -366,6 +519,7 @@ function App() {
 
   useEffect(() => {
     const rootElement = document.documentElement;
+
     if (applicationPreferences.motionPreference === "reduced") {
       rootElement.setAttribute("data-app-motion", "reduced");
     } else {
@@ -376,7 +530,7 @@ function App() {
   }, [applicationPreferences.motionPreference]);
 
   useEffect(() => {
-    if (!taskAnnouncement) return;
+    if (!taskAnnouncement) return undefined;
 
     const timeoutId = window.setTimeout(() => {
       setTaskAnnouncement("");
@@ -384,17 +538,6 @@ function App() {
 
     return () => window.clearTimeout(timeoutId);
   }, [taskAnnouncement]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        TASK_COLUMNS_STORAGE_KEY,
-        JSON.stringify(columns)
-      );
-    } catch (error) {
-      console.error("Unable to save the task board.", error);
-    }
-  }, [columns]);
 
   useEffect(() => {
     try {
@@ -412,6 +555,7 @@ function App() {
 
     const taskId = String(pendingKeyboardFocusTaskId.current);
     pendingKeyboardFocusTaskId.current = null;
+
     taskCardRefs.current.get(taskId)?.focus();
   }, [columns]);
 
@@ -421,32 +565,38 @@ function App() {
 
   function handleSaveProfile(nextProfile) {
     if (!saveProfile(nextProfile)) return false;
+
     setProfile(nextProfile);
     return true;
   }
 
   function handleApplicationPreferencesChange(nextPreferences) {
     if (!saveApplicationPreferences(nextPreferences)) return false;
+
     setApplicationPreferences(nextPreferences);
     return true;
   }
 
   function addNotification(message) {
-    setNotifications((previousNotifications) => [
-      {
-        id: crypto.randomUUID(),
-        message,
-        createdAt: new Date().toISOString(),
-        read: false,
-      },
-      ...previousNotifications,
-    ].slice(0, 20));
+    setNotifications((previousNotifications) =>
+      [
+        {
+          id: crypto.randomUUID(),
+          message,
+          createdAt: new Date().toISOString(),
+          read: false,
+        },
+        ...previousNotifications,
+      ].slice(0, 20)
+    );
   }
 
   function markNotificationsRead() {
     setNotifications((previousNotifications) =>
       previousNotifications.map((notification) =>
-        notification.read ? notification : { ...notification, read: true }
+        notification.read
+          ? notification
+          : { ...notification, read: true }
       )
     );
   }
@@ -455,17 +605,23 @@ function App() {
     const previousColumn = previousColumns.find((column) =>
       column.tasks.some((task) => String(task.id) === String(taskId))
     );
+
     const nextColumn = nextColumns.find((column) =>
       column.tasks.some((task) => String(task.id) === String(taskId))
     );
 
-    if (!previousColumn || !nextColumn || previousColumn.id === nextColumn.id) {
+    if (
+      !previousColumn ||
+      !nextColumn ||
+      previousColumn.id === nextColumn.id
+    ) {
       return;
     }
 
     const task = previousColumn.tasks.find(
       (item) => String(item.id) === String(taskId)
     );
+
     addNotification(
       `${task.title} moved from ${previousColumn.title} to ${nextColumn.title}.`
     );
@@ -490,17 +646,21 @@ function App() {
       taskId: String(taskId),
       message,
     };
+
     setTaskAnnouncement(message);
   }
 
   function openCreateModal() {
     returnFocusRef.current = triggerRef.current;
     setSelectedTask(null);
+
     const todoTaskCount =
       columns.find((column) => column.id === "todo")?.tasks.length || 0;
+
     setDefaultTaskDueDate(
       getStatusBasedDueDate("todo", todoTaskCount)
     );
+
     setIsModalOpen(true);
   }
 
@@ -515,71 +675,160 @@ function App() {
     setSelectedTask(null);
   }
 
-  function saveTask(taskData) {
+  async function saveTask(taskData) {
+    const previousColumns = columns;
+
     if (selectedTask) {
-      addNotification(`Task updated: ${taskData.title}.`);
-      setColumns((previousColumns) =>
-        previousColumns.map((column) => ({
-          ...column,
-          tasks: column.tasks.map((task) =>
-            task.id === selectedTask.id
-              ? { ...task, ...taskData }
-              : task
-          ),
-        }))
-      );
-    } else {
-      // Create new task in To Do
-      const newTask = {
-        id: crypto.randomUUID(),
+      const updatedTask = {
+        ...selectedTask,
         ...taskData,
-        dueDate:
-          taskData.dueDate ||
-          getStatusBasedDueDate(
-            "todo",
-            columns.find((column) => column.id === "todo")?.tasks.length || 0
-          ),
-        status: "todo",
       };
 
-      addNotification(`Task created: ${newTask.title}.`);
-      setColumns((previousColumns) =>
-        previousColumns.map((column) =>
-          column.id === "todo"
-            ? { ...column, tasks: [...column.tasks, newTask] }
-            : column
-        )
-      );
+      const nextColumns = previousColumns.map((column) => ({
+        ...column,
+        tasks: column.tasks.map((task) =>
+          String(task.id) === String(selectedTask.id)
+            ? updatedTask
+            : task
+        ),
+      }));
+
+      setColumns(nextColumns);
+      closeModal();
+
+      try {
+        await updateTask(selectedTask.id, taskData);
+
+        addNotification(`Task updated: ${updatedTask.title}.`);
+      } catch (error) {
+        console.error("Task update failed.", error);
+
+        setColumns(previousColumns);
+
+        addNotification(
+          `Task update failed: ${error.message || "Please try again."}`
+        );
+      }
+
+      return;
     }
 
+    const newTask = {
+      id: crypto.randomUUID(),
+      ...taskData,
+      dueDate:
+        taskData.dueDate ||
+        getStatusBasedDueDate(
+          "todo",
+          previousColumns.find((column) => column.id === "todo")?.tasks.length || 0
+        ),
+      status: "todo",
+    };
+
+    const nextColumns = previousColumns.map((column) =>
+      column.id === "todo"
+        ? { ...column, tasks: [...column.tasks, newTask] }
+        : column
+    );
+
+    setColumns(nextColumns);
     closeModal();
+
+    addNotification(`Task created: ${newTask.title}.`);
+
+    try {
+      await createTask(newTask);
+    } catch (error) {
+      console.error("Task creation failed.", error);
+
+      setColumns(previousColumns);
+
+      addNotification(
+        `Task creation failed: ${error.message || "Please try again."}`
+      );
+    }
   }
 
-  function deleteTask(taskId) {
+  async function deleteTask(taskId) {
     const confirmed = window.confirm(
       "Are you sure you want to delete this task?"
     );
 
     if (!confirmed) return;
 
-    const deletedTask = columns
-      .flatMap((column) => column.tasks)
-      .find((task) => task.id === taskId);
-    if (deletedTask) {
-      addNotification(`Task deleted: ${deletedTask.title}.`);
-    }
+    const previousColumns = columns;
 
-    setColumns((previousColumns) =>
-      previousColumns.map((column) => ({
-        ...column,
-        tasks: column.tasks.filter((task) => task.id !== taskId),
-      }))
+    const deletedTask = previousColumns
+      .flatMap((column) => column.tasks)
+      .find((task) => String(task.id) === String(taskId));
+
+    if (!deletedTask) return;
+
+    const nextColumns = previousColumns.map((column) => ({
+      ...column,
+      tasks: column.tasks.filter(
+        (task) => String(task.id) !== String(taskId)
+      ),
+    }));
+
+    setColumns(nextColumns);
+
+    try {
+      await deleteTaskApi(taskId);
+
+      addNotification(`Task deleted: ${deletedTask.title}.`);
+    } catch (error) {
+      console.error("Task deletion failed.", error);
+
+      setColumns(previousColumns);
+
+      addNotification(
+        `Task deletion failed: ${error.message || "Please try again."}`
+      );
+    }
+  }
+
+  async function saveTaskMovement(previousColumns, nextColumns, taskId) {
+    const previousColumn = previousColumns.find((column) =>
+      column.tasks.some((task) => String(task.id) === String(taskId))
     );
+
+    const nextColumn = nextColumns.find((column) =>
+      column.tasks.some((task) => String(task.id) === String(taskId))
+    );
+
+    if (!previousColumn || !nextColumn) return;
+
+    setColumns(nextColumns);
+
+    announceTaskMovement(previousColumns, nextColumns, taskId);
+    recordTaskStatusChange(previousColumns, nextColumns, taskId);
+
+    if (previousColumn.id === nextColumn.id) return;
+
+    const movedTask = nextColumn.tasks.find(
+      (task) => String(task.id) === String(taskId)
+    );
+
+    try {
+      await updateTask(taskId, {
+        status: nextColumn.id,
+      });
+    } catch (error) {
+      console.error("Task movement failed.", error);
+
+      setColumns(previousColumns);
+
+      addNotification(
+        `Unable to move ${movedTask.title}: ${error.message || "Please try again."}`
+      );
+    }
   }
 
   function handleTaskDragStart(taskId, event) {
     event.dataTransfer.setData("text/plain", String(taskId));
     event.dataTransfer.effectAllowed = "move";
+
     setDraggedTaskId(taskId);
     setKeyboardMove(null);
   }
@@ -587,6 +836,7 @@ function App() {
   function handleColumnDragOver(columnId, event) {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
+
     setDropTargetColumnId(columnId);
   }
 
@@ -595,6 +845,7 @@ function App() {
       setDropTargetColumnId((currentColumnId) =>
         currentColumnId === columnId ? null : currentColumnId
       );
+
       setDropIndicator((currentIndicator) =>
         currentIndicator?.columnId === columnId ? null : currentIndicator
       );
@@ -604,6 +855,7 @@ function App() {
   function handleTaskDragOver(columnId, targetTaskId, event) {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
+
     setDropTargetColumnId(columnId);
 
     if (String(draggedTaskId) === String(targetTaskId)) {
@@ -612,29 +864,38 @@ function App() {
     }
 
     const bounds = event.currentTarget.getBoundingClientRect();
+
     setDropIndicator({
       columnId,
       taskId: targetTaskId,
-      position: event.clientY < bounds.top + bounds.height / 2 ? "before" : "after",
+      position:
+        event.clientY < bounds.top + bounds.height / 2
+          ? "before"
+          : "after",
     });
   }
 
   function handleTaskDrop(columnId, event, targetTaskId = null) {
     event.preventDefault();
     event.stopPropagation();
+
     const taskId = event.dataTransfer.getData("text/plain");
     let targetPosition = null;
 
     if (targetTaskId !== null) {
       const bounds = event.currentTarget.getBoundingClientRect();
+
       targetPosition =
-        event.clientY < bounds.top + bounds.height / 2 ? "before" : "after";
+        event.clientY < bounds.top + bounds.height / 2
+          ? "before"
+          : "after";
     }
 
     if (taskId) {
       const sourceColumnIndex = columns.findIndex((column) =>
         column.tasks.some((task) => String(task.id) === taskId)
       );
+
       const destinationColumnIndex = columns.findIndex(
         (column) => column.id === columnId
       );
@@ -645,11 +906,13 @@ function App() {
             sourceColumnIndex !== destinationColumnIndex ||
             String(task.id) !== taskId
         );
-        const targetIndex = targetTaskId === null
-          ? destinationTasks.length
-          : destinationTasks.findIndex(
-            (item) => String(item.id) === String(targetTaskId)
-          );
+
+        const targetIndex =
+          targetTaskId === null
+            ? destinationTasks.length
+            : destinationTasks.findIndex(
+                (item) => String(item.id) === String(targetTaskId)
+              );
 
         if (targetIndex !== -1) {
           const nextColumns = moveTaskToPosition(
@@ -660,9 +923,7 @@ function App() {
           );
 
           if (nextColumns !== columns) {
-            setColumns(nextColumns);
-            announceTaskMovement(columns, nextColumns, taskId);
-            recordTaskStatusChange(columns, nextColumns, taskId);
+            saveTaskMovement(columns, nextColumns, taskId);
           }
         }
       }
@@ -696,18 +957,22 @@ function App() {
         const sourceColumnIndex = columns.findIndex((column) =>
           column.tasks.some((task) => String(task.id) === String(taskId))
         );
+
         if (sourceColumnIndex === -1) return;
 
         const sourceColumn = columns[sourceColumnIndex];
+
         const sourceIndex = sourceColumn.tasks.findIndex(
           (task) => String(task.id) === String(taskId)
         );
+
         const move = {
           taskId,
           sourceColumnId: sourceColumn.id,
           columnId: sourceColumn.id,
           index: sourceIndex,
         };
+
         setKeyboardMove(move);
         return;
       }
@@ -721,9 +986,12 @@ function App() {
 
       if (nextColumns !== columns) {
         pendingKeyboardFocusTaskId.current = keyboardMove.taskId;
-        setColumns(nextColumns);
-        announceTaskMovement(columns, nextColumns, keyboardMove.taskId);
-        recordTaskStatusChange(columns, nextColumns, keyboardMove.taskId);
+
+        saveTaskMovement(
+          columns,
+          nextColumns,
+          keyboardMove.taskId
+        );
       }
 
       setKeyboardMove(null);
@@ -733,6 +1001,7 @@ function App() {
     if (event.key === "Escape" && activeMove) {
       event.preventDefault();
       event.stopPropagation();
+
       setKeyboardMove(null);
       return;
     }
@@ -754,24 +1023,33 @@ function App() {
     const currentColumnIndex = columns.findIndex(
       (column) => column.id === keyboardMove.columnId
     );
+
     let destinationColumnIndex = currentColumnIndex;
     let destinationIndex = keyboardMove.index;
 
     if (event.key === "ArrowLeft") destinationColumnIndex -= 1;
     if (event.key === "ArrowRight") destinationColumnIndex += 1;
 
-    if (destinationColumnIndex < 0 || destinationColumnIndex >= columns.length) {
+    if (
+      destinationColumnIndex < 0 ||
+      destinationColumnIndex >= columns.length
+    ) {
       return;
     }
 
     const destinationColumn = columns[destinationColumnIndex];
+
     const availableSlots =
       destinationColumn.tasks.length -
       (destinationColumn.id === keyboardMove.sourceColumnId ? 1 : 0);
 
     if (event.key === "ArrowUp") destinationIndex -= 1;
     if (event.key === "ArrowDown") destinationIndex += 1;
-    destinationIndex = Math.max(0, Math.min(destinationIndex, availableSlots));
+
+    destinationIndex = Math.max(
+      0,
+      Math.min(destinationIndex, availableSlots)
+    );
 
     if (
       destinationColumn.id === keyboardMove.columnId &&
@@ -785,6 +1063,7 @@ function App() {
       columnId: destinationColumn.id,
       index: destinationIndex,
     };
+
     setKeyboardMove(move);
   }
 
@@ -806,6 +1085,7 @@ function App() {
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-icon">✓</div>
+
           <div>
             <h2>TaskFlow</h2>
             <p>Plan Smart. Work Better.</p>
@@ -887,6 +1167,7 @@ function App() {
             >
               {profile.initials}
             </div>
+
             <div className="sidebar-profile-info">
               <strong>{profile.fullName}</strong>
             </div>
@@ -904,7 +1185,9 @@ function App() {
         />
 
         {activePage === "help" ? (
-          <HelpCenter onReturnToDashboard={() => setActivePage("dashboard")} />
+          <HelpCenter
+            onReturnToDashboard={() => setActivePage("dashboard")}
+          />
         ) : activePage === "settings" ? (
           <SettingsPage
             theme={theme}
@@ -932,88 +1215,132 @@ function App() {
           />
         ) : (
           <section className="dashboard-content" id="dashboard">
-          <div className="dashboard-heading">
-            <div>
-              <h1>My Tasks</h1>
-              <p>Organize your work and stay on track.</p>
+            <div className="dashboard-heading">
+              <div>
+                <h1>My Tasks</h1>
+                <p>Organize your work and stay on track.</p>
+              </div>
+
+              <button
+                ref={triggerRef}
+                className="add-task-button"
+                onClick={openCreateModal}
+                type="button"
+              >
+                <span>+</span> Add Task
+              </button>
             </div>
 
-            {/*
-            <button className="add-task-button" disabled>
-              <span>+</span> Add Task
-            </button>
-            */}
-            <button
-              ref={triggerRef}
-              className="add-task-button"
-              onClick={openCreateModal}
-              type="button"
-            >
-              <span>+</span> Add Task
-            </button>
-          </div>
+            {taskLoadError && (
+              <div className="task-load-error" role="alert">
+                <p>{taskLoadError}</p>
 
-          {/*
-          <div className="task-board">
-            {taskColumns.map((column) => (
-              <TaskColumn key={column.id} column={column} />
-            ))}
-          </div>
-          */}
-          <div className="task-board">
-            {columns.map((column) => (
-              <TaskColumn
-                key={column.id}
-                column={column}
-                onEdit={openEditModal}
-                onDelete={deleteTask}
-                draggedTaskId={draggedTaskId}
-                dropIndicator={dropIndicator}
-                keyboardMove={keyboardMove}
-                isDropTarget={
-                  dropTargetColumnId === column.id ||
-                  keyboardMove?.columnId === column.id
-                }
-                onTaskDragStart={handleTaskDragStart}
-                onTaskDragEnd={handleTaskDragEnd}
-                onTaskDragOver={(taskId, event) =>
-                  handleTaskDragOver(column.id, taskId, event)
-                }
-                onTaskKeyDown={handleTaskKeyDown}
-                onTaskCardRef={(taskId, element) => {
-                  const key = String(taskId);
-                  if (element) {
-                    taskCardRefs.current.set(key, element);
-                  } else {
-                    taskCardRefs.current.delete(key);
+                <button
+                  type="button"
+                  onClick={loadBoardTasks}
+                  disabled={isTasksLoading}
+                >
+                  {isTasksLoading ? "Retrying..." : "Retry"}
+                </button>
+              </div>
+            )}
+
+            {isTasksLoading &&
+              columns.every((column) => column.tasks.length === 0) && (
+                <div
+                  className="task-board task-board-loading"
+                  role="status"
+                  aria-label="Loading tasks"
+                >
+                  {taskColumns.map((column) => (
+                    <div
+                      className="task-column task-loading-column"
+                      key={column.id}
+                    >
+                      <div className="task-loading-header">
+                        <div className="task-loading-line"></div>
+                        <div className="task-loading-count"></div>
+                      </div>
+
+                      {[1, 2, 3].map((item) => (
+                        <div className="task-loading-card" key={item}>
+                          <div className="task-loading-line"></div>
+                          <div className="task-loading-line short"></div>
+                          <div className="task-loading-footer"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+            <div className="task-board">
+              {columns.map((column) => (
+                <TaskColumn
+                  key={column.id}
+                  column={column}
+                  onEdit={openEditModal}
+                  onDelete={deleteTask}
+                  draggedTaskId={draggedTaskId}
+                  dropIndicator={dropIndicator}
+                  keyboardMove={keyboardMove}
+                  isDropTarget={
+                    dropTargetColumnId === column.id ||
+                    keyboardMove?.columnId === column.id
                   }
-                }}
-                onColumnDragOver={(event) => handleColumnDragOver(column.id, event)}
-                onColumnDragLeave={(event) => handleColumnDragLeave(column.id, event)}
-                onTaskDrop={(event, targetTaskId) =>
-                  handleTaskDrop(column.id, event, targetTaskId)
-                }
-              />
-            ))}
-          </div>
-          <p id="task-keyboard-help" className="visually-hidden">
-            Press Enter or Space on a task to pick it up. Use the arrow keys to
-            choose a column and position, then press Enter or Space to drop.
-            Press Escape to cancel. Tab cancels movement and continues navigation.
-          </p>
-          <div
-            className={`task-movement-notification${taskAnnouncement ? " is-visible" : ""}`}
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            <span className="task-movement-notification-icon" aria-hidden="true">
-              ✓
-            </span>
-            {taskAnnouncement}
-          </div>
+                  onTaskDragStart={handleTaskDragStart}
+                  onTaskDragEnd={handleTaskDragEnd}
+                  onTaskDragOver={(taskId, event) =>
+                    handleTaskDragOver(column.id, taskId, event)
+                  }
+                  onTaskKeyDown={handleTaskKeyDown}
+                  onTaskCardRef={(taskId, element) => {
+                    const key = String(taskId);
+
+                    if (element) {
+                      taskCardRefs.current.set(key, element);
+                    } else {
+                      taskCardRefs.current.delete(key);
+                    }
+                  }}
+                  onColumnDragOver={(event) =>
+                    handleColumnDragOver(column.id, event)
+                  }
+                  onColumnDragLeave={(event) =>
+                    handleColumnDragLeave(column.id, event)
+                  }
+                  onTaskDrop={(event, targetTaskId) =>
+                    handleTaskDrop(column.id, event, targetTaskId)
+                  }
+                />
+              ))}
+            </div>
+
+            <p id="task-keyboard-help" className="visually-hidden">
+              Press Enter or Space on a task to pick it up. Use the arrow keys
+              to choose a column and position, then press Enter or Space to
+              drop. Press Escape to cancel. Tab cancels movement and continues
+              navigation.
+            </p>
+
+            <div
+              className={`task-movement-notification${taskAnnouncement ? " is-visible" : ""}`}
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <span
+                className="task-movement-notification-icon"
+                aria-hidden="true"
+              >
+                ✓
+              </span>
+
+              {taskAnnouncement}
+            </div>
           </section>
         )}
+
         {isModalOpen && (
           <TaskModal
             isOpen={isModalOpen}

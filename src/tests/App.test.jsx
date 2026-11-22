@@ -54,9 +54,9 @@ async function checkProgressAndReturnToDashboard(user, expected) {
 
 describe("dashboard task statistics", () => {
   beforeEach(() => {
-    localStorage.clear();
-  });
-
+  localStorage.clear();
+  vi.spyOn(Math, "random").mockReturnValue(0.5);
+});
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();

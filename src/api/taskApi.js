@@ -1,3 +1,4 @@
+
 import initialTasks from "../data/tasks.json";
 
 const DELAY = 600;
@@ -22,17 +23,29 @@ export async function getTasks() {
   return structuredClone(tasks);
 }
 
+export function hydrateTasks(savedTasks) {
+  if (!Array.isArray(savedTasks)) {
+    throw new Error("Tasks must be an array.");
+  }
+
+  tasks = structuredClone(savedTasks);
+}
+
 export async function createTask(taskData) {
   await simulateRequest();
 
   const newTask = {
     ...taskData,
-    id: crypto.randomUUID(),
+    id: taskData.id || crypto.randomUUID(),
     description: taskData.description || "",
     label: taskData.label || "",
     priority: taskData.priority || "Medium",
     status: taskData.status || "todo",
   };
+
+  if (tasks.some((task) => String(task.id) === String(newTask.id))) {
+    throw new Error("A task with this ID already exists.");
+  }
 
   tasks = [...tasks, newTask];
 
