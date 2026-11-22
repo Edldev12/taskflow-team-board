@@ -519,17 +519,35 @@ function App() {
 
   function saveTask(taskData) {
     if (selectedTask) {
-      addNotification(`Task updated: ${taskData.title}.`);
-      setColumns((previousColumns) =>
-        previousColumns.map((column) => ({
-          ...column,
-          tasks: column.tasks.map((task) =>
-            task.id === selectedTask.id
-              ? { ...task, ...taskData }
-              : task
-          ),
-        }))
+      const sourceColumn = columns.find((column) =>
+        column.tasks.some(
+          (task) => String(task.id) === String(selectedTask.id)
+        )
       );
+      const destinationColumn = columns.find(
+        (column) => column.id === taskData.status
+      );
+      const updatedColumns = columns.map((column) => ({
+        ...column,
+        tasks: column.tasks.map((task) =>
+          task.id === selectedTask.id ? { ...task, ...taskData } : task
+        ),
+      }));
+      const nextColumns =
+        sourceColumn &&
+        destinationColumn &&
+        sourceColumn.id !== destinationColumn.id
+          ? moveTaskToPosition(
+              updatedColumns,
+              selectedTask.id,
+              destinationColumn.id,
+              destinationColumn.tasks.length
+            )
+          : updatedColumns;
+
+      recordTaskStatusChange(columns, nextColumns, selectedTask.id);
+      addNotification(`Task updated: ${taskData.title}.`);
+      setColumns(nextColumns);
     } else {
       // Create new task in To Do
       const newTask = {

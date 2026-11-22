@@ -30,7 +30,7 @@ const faqItems = [
     icon: Pencil,
     question: "How can I edit an existing task?",
     answer:
-      "Find the task card and select its Edit button. Update the title, description, due date, priority, or label, then select Save Changes. Status is changed by moving the card between columns, not in the edit form.",
+      "Find the task card and select its Edit button. Update the title, description, status, due date, priority, or label, then select Save Changes. You can also change status by moving the card between columns.",
   },
   {
     id: "delete-task",
@@ -51,7 +51,7 @@ const faqItems = [
     icon: CircleCheck,
     question: "What do To Do, In Progress, and Done mean?",
     answer:
-      "To Do is planned work that has not started. In Progress is work currently underway. Done is completed work. Move a card to the matching column to update its status.",
+      "To Do is planned work that has not started. In Progress is work currently underway. Done is completed work. Select a status in the Edit Task form or move the card to the matching column.",
   },
   {
     id: "task-priorities",

@@ -494,7 +494,7 @@ describe("dashboard task statistics", () => {
 
   it("shows all shared tasks and reflects create, edit, and delete changes", async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<App />);
 
     await user.click(screen.getByRole("link", { name: /My Tasks/ }));
@@ -543,16 +543,27 @@ describe("dashboard task statistics", () => {
         name: "Edit Track My Tasks updates",
       })
     );
+    const editDialog = screen.getByRole("dialog", { name: "Edit Task" });
     const titleInput = screen.getByLabelText("Task Title *");
     await user.clear(titleInput);
     await user.type(titleInput, "Updated My Tasks item");
+    await user.selectOptions(within(editDialog).getByLabelText("Status"), "done");
     await user.click(screen.getByRole("button", { name: "Save Changes" }));
 
     expect(
       within(myTasksPage).getByRole("article", {
-        name: "Updated My Tasks item, To Do",
+        name: "Updated My Tasks item, Done",
       })
     ).toBeTruthy();
+
+    await user.click(screen.getByRole("link", { name: /Dashboard/ }));
+    expect(
+      screen.getByRole("article", {
+        name: /Updated My Tasks item, Done/,
+      })
+    ).toBeTruthy();
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+    myTasksPage = screen.getByRole("region", { name: "My Tasks" });
 
     await user.click(
       within(myTasksPage).getByRole("button", {
@@ -561,11 +572,24 @@ describe("dashboard task statistics", () => {
     );
     expect(confirmSpy).toHaveBeenCalledTimes(1);
     expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Updated My Tasks item, Done",
+      })
+    ).toBeTruthy();
+
+    confirmSpy.mockReturnValue(true);
+    await user.click(
+      within(myTasksPage).getByRole("button", {
+        name: "Delete Updated My Tasks item",
+      })
+    );
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+    expect(
       within(myTasksPage).getByRole("group", { name: "Total Tasks" }).textContent
     ).toContain("10");
     expect(
       within(myTasksPage).queryByRole("article", {
-        name: "Updated My Tasks item, To Do",
+        name: "Updated My Tasks item, Done",
       })
     ).toBeNull();
   });

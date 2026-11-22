@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, Inbox, ListTodo } from "lucide-react";
-import { isValidDueDate } from "../utils/taskDates";
+import { Inbox, ListTodo } from "lucide-react";
+import TaskCard from "./TaskCard";
 import "./MyTasksPage.css";
 
 const taskStatusLabels = {
@@ -10,15 +10,6 @@ const taskStatusLabels = {
 };
 
 const taskPriorities = ["Low", "Medium", "High"];
-
-function formatDueDate(dueDate) {
-  if (!isValidDueDate(dueDate)) return "";
-
-  const [year, month, day] = dueDate.split("-").map(Number);
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "long",
-  }).format(new Date(year, month - 1, day));
-}
 
 function MyTasksPage({
   columns,
@@ -213,72 +204,16 @@ function MyTasksPage({
           ) : (
             <div className="my-task-grid">
               {filteredTasks.map(({ task, status, statusId }) => {
-                const priority = task.priority || "Priority not set";
-                const priorityClass = task.priority?.toLowerCase();
-                const dueDate = isValidDueDate(task.dueDate)
-                  ? formatDueDate(task.dueDate)
-                  : "";
-
                 return (
-                  <article
-                    className="my-task-card"
+                  <TaskCard
+                    variant="my-tasks"
+                    task={task}
+                    columnTitle={status}
+                    statusId={statusId}
                     key={task.id}
-                    aria-label={`${task.title}, ${status}`}
-                  >
-                    <div className="my-task-card-heading">
-                      <h2>{task.title}</h2>
-                      <span
-                        className={`my-task-status my-task-status--${statusId}`}
-                      >
-                        {status}
-                      </span>
-                    </div>
-
-                    <p className="my-task-description">
-                      {task.description || "No description provided."}
-                    </p>
-
-                    <div className="my-task-tags">
-                      <span className="task-label">
-                        {task.label || "No label"}
-                      </span>
-                      <span
-                        className={`priority${
-                          priorityClass ? ` ${priorityClass}` : ""
-                        }`}
-                      >
-                        {priority}
-                      </span>
-                    </div>
-
-                    {dueDate && (
-                      <div className="my-task-due-date">
-                        <CalendarDays size={15} aria-hidden="true" />
-                        <time dateTime={task.dueDate}>Due {dueDate}</time>
-                      </div>
-                    )}
-
-                    <div className="task-card-actions my-task-actions">
-                      <button
-                        type="button"
-                        className="task-edit-button"
-                        onClick={(event) =>
-                          onEditTask(task, event.currentTarget)
-                        }
-                        aria-label={`Edit ${task.title}`}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="task-delete-button"
-                        onClick={() => onDeleteTask(task.id)}
-                        aria-label={`Delete ${task.title}`}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </article>
+                    onEdit={onEditTask}
+                    onDelete={onDeleteTask}
+                  />
                 );
               })}
             </div>
