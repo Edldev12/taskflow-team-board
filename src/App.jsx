@@ -1,5 +1,6 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import CalendarPage from "./components/CalendarPage";
 import Header from "./components/Header";
 import HelpCenter from "./components/HelpCenter";
 import SettingsPage from "./components/SettingsPage";
@@ -805,7 +806,12 @@ function App() {
             My Tasks
           </a>
 
-          <a href="#calendar" className="nav-link">
+          <a
+            href="#calendar"
+            className={`nav-link${activePage === "calendar" ? " active" : ""}`}
+            aria-current={activePage === "calendar" ? "page" : undefined}
+            onClick={() => setActivePage("calendar")}
+          >
             <span className="nav-icon">▣</span>
             Calendar
           </a>
@@ -889,6 +895,8 @@ function App() {
             pendingTasks={taskStats.pending}
             completionPercentage={taskStats.completionPercentage}
           />
+        ) : activePage === "calendar" ? (
+          <CalendarPage />
         ) : (
           <section className="dashboard-content" id="dashboard">
           <div className="dashboard-heading">

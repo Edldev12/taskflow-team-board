@@ -349,6 +349,67 @@ describe("dashboard task statistics", () => {
     ).toContain("Design landing page moved from To Do to In Progress.");
   });
 
+  it("opens a responsive monthly calendar from the sidebar and navigates months", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+
+    const calendarPage = screen.getByRole("region", { name: "Calendar" });
+    const calendarLink = screen.getByRole("link", { name: /Calendar/ });
+    expect(calendarLink.getAttribute("aria-current")).toBe("page");
+    expect(within(calendarPage).getByRole("heading", { name: "Calendar" })).toBeTruthy();
+
+    const today = new Date();
+    const expectedMonth = new Intl.DateTimeFormat(undefined, {
+      month: "long",
+      year: "numeric",
+    }).format(today);
+    let calendarTable = within(calendarPage).getByRole("table", {
+      name: `${expectedMonth} calendar`,
+    });
+    expect(
+      within(calendarTable).getAllByRole("columnheader").map((header) =>
+        header.getAttribute("aria-label")
+      )
+    ).toEqual([
+      "Sunday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+    ]);
+
+    const dateCells = within(calendarTable).getAllByRole("cell");
+    expect(dateCells).toHaveLength(42);
+    const firstVisibleDate = new Date(
+      `${dateCells[0].querySelector("time").dateTime}T12:00:00`
+    );
+    expect(firstVisibleDate.getDay()).toBe(0);
+    const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const firstOfMonthIndex = dateCells.findIndex(
+      (cell) => cell.querySelector("time").dateTime ===
+        `${firstOfMonth.getFullYear()}-${String(firstOfMonth.getMonth() + 1).padStart(2, "0")}-01`
+    );
+    expect(firstOfMonthIndex % 7).toBe(firstOfMonth.getDay());
+    expect(dateCells.some((cell) => cell.getAttribute("aria-current") === "date")).toBe(
+      true
+    );
+
+    await user.click(screen.getByRole("button", { name: "Next month" }));
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    const nextMonthLabel = new Intl.DateTimeFormat(undefined, {
+      month: "long",
+      year: "numeric",
+    }).format(nextMonth);
+    calendarTable = within(calendarPage).getByRole("table", {
+      name: `${nextMonthLabel} calendar`,
+    });
+    expect(within(calendarTable).getAllByRole("cell")).toHaveLength(42);
+  });
+
   it("restores manual themes after refresh and keeps them across navigation", async () => {
     const user = userEvent.setup();
     const firstRender = render(<App />);
