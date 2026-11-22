@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
+import ProfileInformationSection from "./ProfileInformationSection";
 import "./SettingsPage.css";
 
 const themeOptions = [
@@ -23,7 +24,13 @@ const themeOptions = [
   },
 ];
 
-function SettingsPage({ theme, themePreference, onThemePreferenceChange }) {
+function SettingsPage({
+  theme,
+  themePreference,
+  onThemePreferenceChange,
+  profile,
+  onSaveProfile,
+}) {
   const headingRef = useRef(null);
 
   useEffect(() => {
@@ -89,6 +96,11 @@ function SettingsPage({ theme, themePreference, onThemePreferenceChange }) {
             : " — set by your selection."}
         </p>
       </section>
+
+      <ProfileInformationSection
+        profile={profile}
+        onSaveProfile={onSaveProfile}
+      />
     </section>
   );
 }

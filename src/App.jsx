@@ -7,6 +7,7 @@ import TaskColumn from "./components/TaskColumn";
 import YourProgressPage from "./components/YourProgressPage";
 import "./App.css";
 import TaskModal from "./components/TaskModal";
+import { loadProfile, saveProfile } from "./utils/profileStorage";
 
 const taskColumns = [
   {
@@ -216,6 +217,7 @@ function App() {
   const [themePreference, setThemePreference] = useState(loadThemePreference);
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
   const theme = themePreference === "system" ? systemTheme : themePreference;
+  const [profile, setProfile] = useState(loadProfile);
   const [activePage, setActivePage] = useState("dashboard");
   const [columns, setColumns] = useState(loadTaskColumns);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -319,6 +321,12 @@ function App() {
 
   function toggleTheme(selectedTheme) {
     setThemePreference(selectedTheme);
+  }
+
+  function handleSaveProfile(nextProfile) {
+    if (!saveProfile(nextProfile)) return false;
+    setProfile(nextProfile);
+    return true;
   }
 
   function announceTaskMovement(previousColumns, nextColumns, taskId) {
@@ -710,17 +718,22 @@ function App() {
           </div>
 
           <div className="sidebar-profile">
-            <div className="profile-avatar">WK</div>
+            <div
+              className="profile-avatar"
+              role="img"
+              aria-label={`${profile.initials} profile initials`}
+            >
+              {profile.initials}
+            </div>
             <div className="sidebar-profile-info">
-              <strong>Weynshet</strong>
-              <span>Team Member</span>
+              <strong>{profile.fullName}</strong>
             </div>
           </div>
         </div>
       </aside>
 
       <main className="main-layout">
-        <Header />
+        <Header profile={profile} />
 
         {activePage === "help" ? (
           <HelpCenter onReturnToDashboard={() => setActivePage("dashboard")} />
@@ -729,6 +742,8 @@ function App() {
             theme={theme}
             themePreference={themePreference}
             onThemePreferenceChange={setThemePreference}
+            profile={profile}
+            onSaveProfile={handleSaveProfile}
           />
         ) : activePage === "progress" ? (
           <YourProgressPage

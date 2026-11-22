@@ -1,7 +1,7 @@
 import { Bell } from "lucide-react";
 import "./Header.css";
 
-function Header() {
+function Header({ profile }) {
   return (
     <header className="top-header">
       <div className="header-search">
@@ -24,7 +24,13 @@ function Header() {
 </button>
 
         <div className="header-profile">
-          <div className="profile-avatar">WK</div>
+  <div
+    className="profile-avatar"
+    role="img"
+    aria-label={`${profile.initials} profile initials`}
+  >
+    {profile.initials}
+  </div>
         </div>
       </div>
     </header>

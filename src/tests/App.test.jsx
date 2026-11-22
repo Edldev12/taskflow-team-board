@@ -355,4 +355,86 @@ describe("dashboard task statistics", () => {
     await user.click(priorityQuestion);
     expect(priorityQuestion.getAttribute("aria-expanded")).toBe("false");
   });
+
+  it("validates, saves, and restores profile information", async () => {
+    const user = userEvent.setup();
+    const { container, unmount } = render(<App />);
+    await user.click(screen.getByRole("link", { name: /Settings/ }));
+
+    let profileSection = screen.getByRole("region", {
+      name: "Profile Information",
+    });
+    expect(
+      within(profileSection).getByRole("heading", { name: "Weynshet" })
+    ).toBeTruthy();
+    expect(within(profileSection).getByText("Email not provided")).toBeTruthy();
+    expect(
+      within(profileSection).getByRole("img", {
+        name: "WK profile initials",
+      })
+    ).toBeTruthy();
+
+    await user.click(
+      within(profileSection).getByRole("button", { name: "Edit Profile" })
+    );
+    await user.clear(screen.getByLabelText(/Full Name/));
+    await user.type(screen.getByLabelText(/Email Address/), "not-an-email");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    const validationAlert = screen.getByRole("alert");
+    expect(validationAlert.textContent).toContain("Enter your full name.");
+    expect(validationAlert.textContent).toContain("Enter a valid email address");
+    expect(localStorage.getItem("taskflow-team-board.profile")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    profileSection = screen.getByRole("region", {
+      name: "Profile Information",
+    });
+    expect(
+      within(profileSection).getByRole("heading", { name: "Weynshet" })
+    ).toBeTruthy();
+
+    await user.click(
+      within(profileSection).getByRole("button", { name: "Edit Profile" })
+    );
+    await user.clear(screen.getByLabelText(/Full Name/));
+    await user.type(screen.getByLabelText(/Full Name/), "Ada Lovelace");
+    await user.type(screen.getByLabelText(/Email Address/), "ada@example.com");
+    await user.clear(screen.getByLabelText(/Avatar Initials/));
+    await user.type(screen.getByLabelText(/Avatar Initials/), "AL");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    profileSection = screen.getByRole("region", {
+      name: "Profile Information",
+    });
+    expect(
+      within(profileSection).getByRole("heading", { name: "Ada Lovelace" })
+    ).toBeTruthy();
+    expect(
+      within(profileSection).getByText("ada@example.com")
+    ).toBeTruthy();
+    expect(
+      container.querySelector(".sidebar-profile-info strong").textContent
+    ).toBe("Ada Lovelace");
+    expect(
+      container.querySelector(".header-profile .profile-avatar").textContent
+    ).toContain("AL");
+    expect(
+      JSON.parse(localStorage.getItem("taskflow-team-board.profile"))
+    ).toMatchObject({
+      fullName: "Ada Lovelace",
+      email: "ada@example.com",
+      initials: "AL",
+    });
+
+    unmount();
+    render(<App />);
+    await user.click(screen.getByRole("link", { name: /Settings/ }));
+    profileSection = screen.getByRole("region", {
+      name: "Profile Information",
+    });
+    expect(
+      within(profileSection).getByRole("heading", { name: "Ada Lovelace" })
+    ).toBeTruthy();
+  });
 });

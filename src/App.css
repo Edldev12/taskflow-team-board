@@ -167,6 +167,12 @@
   font-size: 11px;
 }
 
+.sidebar-profile-info strong,
+.sidebar-profile-info span {
+  max-width: 145px;
+  overflow-wrap: anywhere;
+}
+
 /* Main dashboard */
 .main-layout {
   min-width: 0;
@@ -541,6 +547,11 @@
 }
 
 .app-layout[data-theme="dark"] .brand-icon {
+  background: #30465e;
+  color: #9bcfff;
+}
+
+.app-layout[data-theme="dark"] .profile-avatar {
   background: #30465e;
   color: #9bcfff;
 }
