@@ -468,6 +468,30 @@ describe("dashboard task statistics", () => {
     ).toBeTruthy();
   });
 
+  it("navigates between Dashboard and the My Tasks board", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+
+    expect(screen.getByRole("heading", { name: "My Tasks" })).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: /My Tasks/ }).getAttribute("aria-current")
+    ).toBe("page");
+    expect(
+      screen.getByRole("link", { name: /Dashboard/ }).getAttribute("aria-current")
+    ).toBeNull();
+
+    await user.click(screen.getByRole("link", { name: /Dashboard/ }));
+    expect(
+      screen.getByRole("link", { name: /Dashboard/ }).getAttribute("aria-current")
+    ).toBe("page");
+    expect(
+      screen.getByRole("link", { name: /My Tasks/ }).getAttribute("aria-current")
+    ).toBeNull();
+  });
+
   it("assigns missing due dates by status and displays tasks on their saved dates", async () => {
     const user = userEvent.setup();
     const now = new Date();

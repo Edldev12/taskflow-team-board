@@ -825,7 +825,12 @@ function App() {
             Dashboard
           </a>
 
-          <a href="#my-tasks" className="nav-link">
+          <a
+            href="#my-tasks"
+            className={`nav-link${activePage === "my-tasks" ? " active" : ""}`}
+            aria-current={activePage === "my-tasks" ? "page" : undefined}
+            onClick={() => setActivePage("my-tasks")}
+          >
             <span className="nav-icon">☑</span>
             My Tasks
           </a>
