@@ -1,8 +1,8 @@
 
 :root {
   font-family: Inter, Arial, sans-serif;
-  color: #26374a;
-  background: #f5f9fd;
+  color: var(--text);
+  background: var(--background);
   color-scheme: light;
 
   --background: #f5f9fd;
@@ -10,6 +10,15 @@
   --text: #26374a;
   --muted: #8492a3;
   --border: #e5ebf2;
+}
+
+:root[data-theme="dark"] {
+  --background: #172333;
+  --surface: #202f42;
+  --text: #edf3fa;
+  --muted: #a6b4c5;
+  --border: #35465b;
+  color-scheme: dark;
 }
 
 * {

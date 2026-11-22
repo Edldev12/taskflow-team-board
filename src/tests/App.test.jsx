@@ -273,6 +273,68 @@ describe("dashboard task statistics", () => {
     ).toContain("following your device preference");
   });
 
+  it("restores manual themes after refresh and keeps them across navigation", async () => {
+    const user = userEvent.setup();
+    const firstRender = render(<App />);
+    await user.click(screen.getByRole("link", { name: /Settings/ }));
+    await user.click(screen.getByRole("button", { name: /Dark Mode/ }));
+
+    expect(
+      firstRender.container.querySelector(".app-layout").dataset.theme
+    ).toBe("dark");
+    expect(localStorage.getItem("taskflow-team-board.theme")).toBe("dark");
+
+    const sidebarPages = [
+      /Dashboard/,
+      /My Tasks/,
+      /Calendar/,
+      /Help/,
+      /Your Progress/,
+      /Settings/,
+    ];
+    for (const pageName of sidebarPages) {
+      await user.click(screen.getByRole("link", { name: pageName }));
+      expect(
+        firstRender.container.querySelector(".app-layout").dataset.theme
+      ).toBe("dark");
+    }
+
+    firstRender.unmount();
+    const darkRefresh = render(<App />);
+    expect(
+      darkRefresh.container.querySelector(".app-layout").dataset.theme
+    ).toBe("dark");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+
+    await user.click(screen.getByRole("link", { name: /Settings/ }));
+    await user.click(screen.getByRole("button", { name: /Light Mode/ }));
+    expect(localStorage.getItem("taskflow-team-board.theme")).toBe("light");
+    darkRefresh.unmount();
+
+    const lightRefresh = render(<App />);
+    expect(
+      lightRefresh.container.querySelector(".app-layout").dataset.theme
+    ).toBe("light");
+    expect(document.documentElement.dataset.theme).toBe("light");
+  });
+
+  it("falls back to the device theme when the stored theme is invalid", () => {
+    localStorage.setItem("taskflow-team-board.theme", "violet");
+    originalWindowMatchMedia = window.matchMedia;
+    const mediaQuery = {
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    vi.stubGlobal("matchMedia", vi.fn(() => mediaQuery));
+    window.matchMedia = vi.fn(() => mediaQuery);
+
+    const { container } = render(<App />);
+
+    expect(container.querySelector(".app-layout").dataset.theme).toBe("dark");
+    expect(localStorage.getItem("taskflow-team-board.theme")).toBeNull();
+  });
+
   it("applies and restores application preferences", async () => {
     const user = userEvent.setup();
     const { container, unmount } = render(<App />);

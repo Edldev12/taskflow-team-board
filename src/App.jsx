@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Header from "./components/Header";
 import HelpCenter from "./components/HelpCenter";
 import SettingsPage from "./components/SettingsPage";
@@ -48,9 +48,20 @@ const taskColumns = [
 ];
 
 const TASK_COLUMNS_STORAGE_KEY = "taskflow-team-board.columns";
-const THEME_PREFERENCE_STORAGE_KEY = "taskflow-team-board.theme";
+const THEME_PREFERENCE_STORAGE_KEY =
+  document.documentElement.dataset.themeStorageKey ||
+  "taskflow-team-board.theme";
 
 function loadThemePreference() {
+  const bootPreference = document.documentElement.dataset.themePreference;
+  if (
+    bootPreference === "light" ||
+    bootPreference === "dark" ||
+    bootPreference === "system"
+  ) {
+    return bootPreference;
+  }
+
   try {
     const preference = window.localStorage.getItem(THEME_PREFERENCE_STORAGE_KEY);
     return preference === "light" || preference === "dark"
@@ -263,6 +274,16 @@ function App() {
           : Math.round((counts.completed / counts.total) * 100),
     };
   }, [columns]);
+
+  useLayoutEffect(() => {
+    const rootElement = document.documentElement;
+    rootElement.dataset.theme = theme;
+    rootElement.dataset.themePreference = themePreference;
+    return () => {
+      delete rootElement.dataset.theme;
+      delete rootElement.dataset.themePreference;
+    };
+  }, [theme, themePreference]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)");
