@@ -1,11 +1,20 @@
 
 import { useEffect, useRef, useState } from "react";
+import { isValidDueDate } from "../utils/taskDates";
 import "./TaskModal.css";
 
-function TaskModal({ isOpen, onClose, onSave, task, returnFocusRef }) {
+function TaskModal({
+  isOpen,
+  onClose,
+  onSave,
+  task,
+  defaultDueDate,
+  returnFocusRef,
+}) {
   const [formData, setFormData] = useState(() => ({
     title: task?.title || "",
     description: task?.description || "",
+    dueDate: task?.dueDate || defaultDueDate,
     priority: task?.priority || "Medium",
     label: task?.label || "",
   }));
@@ -90,6 +99,16 @@ function TaskModal({ isOpen, onClose, onSave, task, returnFocusRef }) {
       return;
     }
 
+    if (formData.dueDate && !isValidDueDate(formData.dueDate)) {
+      setError("Enter a valid due date.");
+      return;
+    }
+
+    if (!formData.dueDate) {
+      setError("A due date is required.");
+      return;
+    }
+
     onSave({
       ...formData,
       title,
@@ -152,6 +171,18 @@ function TaskModal({ isOpen, onClose, onSave, task, returnFocusRef }) {
               placeholder="Describe your task"
               maxLength={500}
               rows={4}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="task-due-date">Due date *</label>
+            <input
+              id="task-due-date"
+              name="dueDate"
+              type="date"
+              value={formData.dueDate}
+              onChange={handleChange}
+              required
             />
           </div>
 

@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../App";
 
@@ -54,6 +61,7 @@ describe("dashboard task statistics", () => {
     cleanup();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
     if (originalWindowMatchMedia === undefined) {
       delete window.matchMedia;
     } else {
@@ -394,20 +402,329 @@ describe("dashboard task statistics", () => {
         `${firstOfMonth.getFullYear()}-${String(firstOfMonth.getMonth() + 1).padStart(2, "0")}-01`
     );
     expect(firstOfMonthIndex % 7).toBe(firstOfMonth.getDay());
-    expect(dateCells.some((cell) => cell.getAttribute("aria-current") === "date")).toBe(
+    const highlightedToday = dateCells.filter(
+      (cell) => cell.getAttribute("aria-current") === "date"
+    );
+    expect(highlightedToday).toHaveLength(1);
+    expect(highlightedToday[0].querySelector("time").dateTime).toBe(
+      `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+    );
+
+    const formatMonthLabel = (date) =>
+      new Intl.DateTimeFormat(undefined, {
+        month: "long",
+        year: "numeric",
+      }).format(date);
+    for (let monthIndex = today.getMonth(); monthIndex < 11; monthIndex += 1) {
+      await user.click(screen.getByRole("button", { name: "Next month" }));
+    }
+
+    const december = new Date(today.getFullYear(), 11, 1);
+    let decemberTable = screen.getByRole("table", {
+      name: `${formatMonthLabel(december)} calendar`,
+    });
+    expect(within(decemberTable).getAllByRole("cell")).toHaveLength(42);
+
+    await user.click(screen.getByRole("button", { name: "Next month" }));
+    const january = new Date(today.getFullYear() + 1, 0, 1);
+    const januaryTable = screen.getByRole("table", {
+      name: `${formatMonthLabel(january)} calendar`,
+    });
+    const januaryCells = within(januaryTable).getAllByRole("cell");
+    const januaryDates = januaryCells.map(
+      (cell) => cell.querySelector("time").dateTime
+    );
+    expect(januaryCells).toHaveLength(42);
+    expect(new Set(januaryDates).size).toBe(42);
+    const januaryFirstIndex = januaryDates.indexOf(
+      `${january.getFullYear()}-01-01`
+    );
+    expect(januaryFirstIndex % 7).toBe(january.getDay());
+
+    await user.click(screen.getByRole("button", { name: "Previous month" }));
+    decemberTable = screen.getByRole("table", {
+      name: `${formatMonthLabel(december)} calendar`,
+    });
+    expect(decemberTable).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Today" }));
+    const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    expect(
+      screen.getByRole("table", {
+        name: `${formatMonthLabel(currentMonth)} calendar`,
+      })
+    ).toBeTruthy();
+
+    const followingMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    const followingMonthLabel = new Intl.DateTimeFormat(undefined, {
+      month: "long",
+      year: "numeric",
+    }).format(followingMonth);
+    await user.click(screen.getByRole("button", { name: "Next month" }));
+    expect(
+      screen.getByRole("table", {
+        name: `${followingMonthLabel} calendar`,
+      })
+    ).toBeTruthy();
+  });
+
+  it("navigates between Dashboard and the My Tasks board", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+
+    expect(screen.getByRole("heading", { name: "My Tasks" })).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: /My Tasks/ }).getAttribute("aria-current")
+    ).toBe("page");
+    expect(
+      screen.getByRole("link", { name: /Dashboard/ }).getAttribute("aria-current")
+    ).toBeNull();
+
+    await user.click(screen.getByRole("link", { name: /Dashboard/ }));
+    expect(
+      screen.getByRole("link", { name: /Dashboard/ }).getAttribute("aria-current")
+    ).toBe("page");
+    expect(
+      screen.getByRole("link", { name: /My Tasks/ }).getAttribute("aria-current")
+    ).toBeNull();
+  });
+
+  it("assigns missing due dates by status and displays tasks on their saved dates", async () => {
+    const user = userEvent.setup();
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const firstDueDate = `${year}-${month}-15`;
+    const updatedDueDate = `${year}-${month}-16`;
+    const dateLabel = (day) =>
+      new Intl.DateTimeFormat(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }).format(new Date(year, now.getMonth(), day));
+    const userCreateTask = async (title, dueDate) => {
+      await user.click(screen.getByRole("button", { name: /add task/i }));
+      await user.type(screen.getByLabelText("Task Title *"), title);
+      if (dueDate) {
+        fireEvent.change(screen.getByLabelText(/Due date/), {
+          target: { value: dueDate },
+        });
+      }
+      await user.click(screen.getByRole("button", { name: "Create Task" }));
+    };
+
+    const { unmount } = render(<App />);
+    await userCreateTask("Due task one", firstDueDate);
+    await userCreateTask("Due task two", firstDueDate);
+    await userCreateTask("Due task three", firstDueDate);
+    await userCreateTask("Automatically dated task", "");
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+
+    const calendarTable = screen.getByRole("table", {
+      name: `${new Intl.DateTimeFormat(undefined, {
+        month: "long",
+        year: "numeric",
+      }).format(now)} calendar`,
+    });
+    const firstDateCell = within(calendarTable).getByRole("cell", {
+      name: dateLabel(15),
+    });
+    expect(within(firstDateCell).getByText("Due task one")).toBeTruthy();
+    expect(within(firstDateCell).getByText("Due task two")).toBeTruthy();
+    expect(within(firstDateCell).queryByText("Due task three")).toBeNull();
+    expect(within(firstDateCell).getByText("+ 1 more")).toBeTruthy();
+    expect(
+      firstDateCell.querySelector(".calendar-task--todo .calendar-task-priority--medium")
+    ).toBeTruthy();
+    await user.click(
+      within(firstDateCell).getByRole("button", {
+        name: new RegExp(`Select ${dateLabel(15)}`),
+      })
+    );
+    const selectedDayPanel = screen.getByRole("region", {
+      name: `Tasks for ${dateLabel(15)}`,
+    });
+    expect(within(selectedDayPanel).getByText("Due task one")).toBeTruthy();
+    expect(within(selectedDayPanel).getByText("Due task two")).toBeTruthy();
+    expect(within(selectedDayPanel).getByText("Due task three")).toBeTruthy();
+    const storedColumnsBeforeEdit = JSON.parse(
+      localStorage.getItem("taskflow-team-board.columns")
+    );
+    const allStoredTasks = storedColumnsBeforeEdit.flatMap(
+      (column) => column.tasks
+    );
+    expect(allStoredTasks.every((task) => /^\d{4}-\d{2}-\d{2}$/.test(task.dueDate))).toBe(
       true
     );
 
-    await user.click(screen.getByRole("button", { name: "Next month" }));
-    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    const nextMonthLabel = new Intl.DateTimeFormat(undefined, {
-      month: "long",
-      year: "numeric",
-    }).format(nextMonth);
-    calendarTable = within(calendarPage).getByRole("table", {
-      name: `${nextMonthLabel} calendar`,
+    const getIsoDate = (date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const expectedInProgressDate = getIsoDate(now);
+    const yesterday = new Date(year, now.getMonth(), now.getDate() - 1);
+    const expectedDoneDate = getIsoDate(yesterday);
+    const todoTomorrow = new Date(year, now.getMonth(), now.getDate() + 1);
+    expect(
+      allStoredTasks.find((task) => task.title === "Build dashboard interface")
+        .dueDate
+    ).toBe(expectedInProgressDate);
+    expect(
+      allStoredTasks.find((task) => task.title === "Set up React project").dueDate
+    ).toBe(expectedDoneDate);
+    expect(
+      allStoredTasks.find((task) => task.title === "Design landing page").dueDate
+    ).toBe(getIsoDate(todoTomorrow));
+
+    const automaticallyDatedTask = allStoredTasks.find(
+      (task) => task.title === "Automatically dated task"
+    );
+    const automaticallyDatedDate = new Date(
+      `${automaticallyDatedTask.dueDate}T12:00:00`
+    );
+    const autoDateCell = within(calendarTable).getByRole("cell", {
+      name: new Intl.DateTimeFormat(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }).format(automaticallyDatedDate),
     });
-    expect(within(calendarTable).getAllByRole("cell")).toHaveLength(42);
+    expect(
+      within(autoDateCell).getByText("Automatically dated task")
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole("link", { name: /Dashboard/ }));
+    await user.click(
+      screen.getByRole("button", { name: "Edit Due task one" })
+    );
+    fireEvent.change(screen.getByLabelText(/Due date/), {
+      target: { value: updatedDueDate },
+    });
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    const savedColumns = JSON.parse(
+      localStorage.getItem("taskflow-team-board.columns")
+    );
+    const updatedTask = savedColumns
+      .flatMap((column) => column.tasks)
+      .find((task) => task.title === "Due task one");
+    expect(updatedTask.dueDate).toBe(updatedDueDate);
+
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+    const updatedCell = within(
+      screen.getByRole("table", {
+        name: `${new Intl.DateTimeFormat(undefined, {
+          month: "long",
+          year: "numeric",
+        }).format(now)} calendar`,
+      })
+    ).getByRole("cell", { name: dateLabel(16) });
+    expect(within(updatedCell).getByText("Due task one")).toBeTruthy();
+
+    const oldCell = within(
+      screen.getByRole("table", {
+        name: `${new Intl.DateTimeFormat(undefined, {
+          month: "long",
+          year: "numeric",
+        }).format(now)} calendar`,
+      })
+    ).getByRole("cell", { name: dateLabel(15) });
+    expect(within(oldCell).queryByText("Due task one")).toBeNull();
+
+    unmount();
+    render(<App />);
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+    const restoredDateCell = within(
+      screen.getByRole("table", {
+        name: `${new Intl.DateTimeFormat(undefined, {
+          month: "long",
+          year: "numeric",
+        }).format(now)} calendar`,
+      })
+    ).getByRole("cell", { name: dateLabel(16) });
+    expect(within(restoredDateCell).getByText("Due task one")).toBeTruthy();
+  });
+
+  it("opens calendar task details, reuses edit, and closes accessibly", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+
+    await user.click(
+      screen.getByRole("button", {
+        name: /Design landing page, To Do, High priority.*View task details/,
+      })
+    );
+
+    let details = screen.getByRole("dialog", {
+      name: "Design landing page",
+    });
+    expect(within(details).getByText("To Do")).toBeTruthy();
+    expect(within(details).getByText("High")).toBeTruthy();
+    expect(within(details).getByText("Design")).toBeTruthy();
+    expect(
+      within(details).getByText("No description provided.")
+    ).toBeTruthy();
+    expect(within(details).getByText("Due date").parentElement.textContent).not
+      .toContain("No due date");
+
+    await user.click(
+      within(details).getByRole("button", { name: "Edit Task" })
+    );
+    const editDialog = screen.getByRole("dialog", { name: "Edit Task" });
+    const titleInput = within(editDialog).getByLabelText("Task Title *");
+    await user.clear(titleInput);
+    await user.type(titleInput, "Updated from Calendar");
+    await user.click(
+      within(editDialog).getByRole("button", { name: "Save Changes" })
+    );
+
+    details = screen.getByRole("dialog", {
+      name: "Updated from Calendar",
+    });
+    expect(within(details).getByText("To Do")).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(
+      screen.queryByRole("dialog", { name: "Updated from Calendar" })
+    ).toBeNull();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: /Updated from Calendar, To Do, High priority.*View task details/,
+      })
+    );
+    fireEvent.mouseDown(
+      screen.getByRole("dialog", { name: "Updated from Calendar" })
+        .parentElement
+    );
+    expect(
+      screen.queryByRole("dialog", { name: "Updated from Calendar" })
+    ).toBeNull();
+  });
+
+  it("moves today's highlight when the local date changes", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 30, 23, 59, 30));
+    render(<App />);
+    fireEvent.click(screen.getByRole("link", { name: /Calendar/ }));
+
+    const calendarTable = () =>
+      screen.getByRole("table", { name: "November 2026 calendar" });
+    const highlightedDate = () =>
+      within(calendarTable())
+        .getAllByRole("cell")
+        .find((cell) => cell.getAttribute("aria-current") === "date");
+    expect(highlightedDate().querySelector("time").dateTime).toBe("2026-11-30");
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(highlightedDate().querySelector("time").dateTime).toBe("2026-12-01");
   });
 
   it("restores manual themes after refresh and keeps them across navigation", async () => {

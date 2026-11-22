@@ -23,14 +23,14 @@ const faqItems = [
     icon: ListTodo,
     question: "How do I create a new task?",
     answer:
-      "On the dashboard, select + Add Task. Enter a required title, then optionally add a description, choose a High, Medium, or Low priority, and type a label. Select Create Task; the new task appears in To Do.",
+      "On the dashboard, select + Add Task. Enter a required title; the due date is prefilled for the next 7 days, and you can change it. Add any optional details, then select Create Task to see it in To Do and on its due date in Calendar.",
   },
   {
     id: "edit-task",
     icon: Pencil,
     question: "How can I edit an existing task?",
     answer:
-      "Find the task card and select its Edit button. Update the title, description, priority, or label, then select Save Changes. Status is changed by moving the card between columns, not in the edit form.",
+      "Find the task card and select its Edit button. Update the title, description, due date, priority, or label, then select Save Changes. Status is changed by moving the card between columns, not in the edit form.",
   },
   {
     id: "delete-task",
