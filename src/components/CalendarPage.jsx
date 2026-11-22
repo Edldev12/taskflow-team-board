@@ -37,9 +37,11 @@ function CalendarPage({ columns }) {
   const [displayedMonth, setDisplayedMonth] = useState(
     () => new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   );
+  const [todayDate, setTodayDate] = useState(() =>
+    getDateTimeValue(new Date())
+  );
   const headingRef = useRef(null);
   const monthLabel = getMonthLabel(displayedMonth);
-  const today = new Date();
   const dates = useMemo(() => {
     const firstOfMonth = new Date(
       displayedMonth.getFullYear(),
@@ -81,6 +83,25 @@ function CalendarPage({ columns }) {
     headingRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    function updateTodayDate() {
+      const currentDate = getDateTimeValue(new Date());
+      setTodayDate((previousDate) =>
+        previousDate === currentDate ? previousDate : currentDate
+      );
+    }
+
+    const intervalId = window.setInterval(updateTodayDate, 60_000);
+    window.addEventListener("focus", updateTodayDate);
+    document.addEventListener("visibilitychange", updateTodayDate);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", updateTodayDate);
+      document.removeEventListener("visibilitychange", updateTodayDate);
+    };
+  }, []);
+
   function changeMonth(offset) {
     setDisplayedMonth(
       (currentMonth) =>
@@ -94,6 +115,7 @@ function CalendarPage({ columns }) {
 
   function goToToday() {
     const currentDate = new Date();
+    setTodayDate(getDateTimeValue(currentDate));
     setDisplayedMonth(
       new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
     );
@@ -171,17 +193,14 @@ function CalendarPage({ columns }) {
                     .map((date) => {
                       const isCurrentMonth =
                         date.getMonth() === displayedMonth.getMonth();
-                      const isToday =
-                        date.getFullYear() === today.getFullYear() &&
-                        date.getMonth() === today.getMonth() &&
-                        date.getDate() === today.getDate();
+                      const dateTimeValue = getDateTimeValue(date);
+                      const isToday = dateTimeValue === todayDate;
                       const accessibleDate = new Intl.DateTimeFormat(undefined, {
                         weekday: "long",
                         month: "long",
                         day: "numeric",
                         year: "numeric",
                       }).format(date);
-                      const dateTimeValue = getDateTimeValue(date);
                       const dueDateTasks = tasksByDueDate.get(dateTimeValue) || [];
                       const visibleTasks = dueDateTasks.slice(
                         0,

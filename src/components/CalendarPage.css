@@ -140,6 +140,11 @@
   background: var(--background);
 }
 
+.calendar-day.is-today {
+  background: #f0f7ff;
+  box-shadow: inset 0 0 0 1px #78afe0;
+}
+
 .calendar-day.is-today time {
   background: #2876bd;
   color: #fff;
@@ -223,6 +228,11 @@
 
 .app-layout[data-theme="dark"] .calendar-day.is-outside-month {
   color: #8292a5;
+}
+
+.app-layout[data-theme="dark"] .calendar-day.is-today {
+  background: #263b51;
+  box-shadow: inset 0 0 0 1px #70aee3;
 }
 
 .app-layout[data-theme="dark"] .calendar-task--todo {

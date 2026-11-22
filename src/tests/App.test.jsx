@@ -61,6 +61,7 @@ describe("dashboard task statistics", () => {
     cleanup();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
     if (originalWindowMatchMedia === undefined) {
       delete window.matchMedia;
     } else {
@@ -401,8 +402,12 @@ describe("dashboard task statistics", () => {
         `${firstOfMonth.getFullYear()}-${String(firstOfMonth.getMonth() + 1).padStart(2, "0")}-01`
     );
     expect(firstOfMonthIndex % 7).toBe(firstOfMonth.getDay());
-    expect(dateCells.some((cell) => cell.getAttribute("aria-current") === "date")).toBe(
-      true
+    const highlightedToday = dateCells.filter(
+      (cell) => cell.getAttribute("aria-current") === "date"
+    );
+    expect(highlightedToday).toHaveLength(1);
+    expect(highlightedToday[0].querySelector("time").dateTime).toBe(
+      `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
     );
 
     const formatMonthLabel = (date) =>
@@ -606,6 +611,27 @@ describe("dashboard task statistics", () => {
       })
     ).getByRole("cell", { name: dateLabel(16) });
     expect(within(restoredDateCell).getByText("Due task one")).toBeTruthy();
+  });
+
+  it("moves today's highlight when the local date changes", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 30, 23, 59, 30));
+    render(<App />);
+    fireEvent.click(screen.getByRole("link", { name: /Calendar/ }));
+
+    const calendarTable = () =>
+      screen.getByRole("table", { name: "November 2026 calendar" });
+    const highlightedDate = () =>
+      within(calendarTable())
+        .getAllByRole("cell")
+        .find((cell) => cell.getAttribute("aria-current") === "date");
+    expect(highlightedDate().querySelector("time").dateTime).toBe("2026-11-30");
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(highlightedDate().querySelector("time").dateTime).toBe("2026-12-01");
   });
 
   it("restores manual themes after refresh and keeps them across navigation", async () => {
