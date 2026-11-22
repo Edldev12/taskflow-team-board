@@ -34,6 +34,45 @@ function getDateTimeValue(date) {
   return `${year}-${month}-${day}`;
 }
 
+function formatAccessibleDate(date) {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function getDateFromValue(value) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function CalendarTaskButton({ task, date, compact = false, onSelect }) {
+  const status = task.status || "todo";
+  const priority = task.priority.toLowerCase();
+  const statusLabel = taskStatusLabels[status] || "To Do";
+
+  return (
+    <button
+      className={`calendar-task calendar-task--${status}${
+        compact ? "" : " calendar-task-expanded"
+      }`}
+      type="button"
+      aria-label={`${task.title}, ${statusLabel}, ${task.priority} priority, due ${date}. View task details`}
+      aria-haspopup="dialog"
+      onClick={() => onSelect(task)}
+      title={`${task.title} - ${statusLabel} - ${task.priority} priority`}
+    >
+      <span className="calendar-task-title">{task.title}</span>
+      <span
+        className={`calendar-task-priority calendar-task-priority--${priority}`}
+        aria-hidden="true"
+      />
+    </button>
+  );
+}
+
 function CalendarPage({ columns, onEditTask, isEditModalOpen }) {
   const [displayedMonth, setDisplayedMonth] = useState(
     () => new Date(new Date().getFullYear(), new Date().getMonth(), 1)
@@ -42,6 +81,7 @@ function CalendarPage({ columns, onEditTask, isEditModalOpen }) {
     getDateTimeValue(new Date())
   );
   const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(null);
   const headingRef = useRef(null);
   const monthLabel = getMonthLabel(displayedMonth);
   const dates = useMemo(() => {
@@ -86,6 +126,12 @@ function CalendarPage({ columns, onEditTask, isEditModalOpen }) {
       : columns
         .flatMap((column) => column.tasks)
         .find((task) => String(task.id) === String(selectedTaskId)) || null;
+  const selectedDateTasks = selectedDate
+    ? tasksByDueDate.get(selectedDate) || []
+    : [];
+  const selectedDateLabel = selectedDate
+    ? formatAccessibleDate(getDateFromValue(selectedDate))
+    : "";
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -111,6 +157,7 @@ function CalendarPage({ columns, onEditTask, isEditModalOpen }) {
   }, []);
 
   function changeMonth(offset) {
+    setSelectedDate(null);
     setDisplayedMonth(
       (currentMonth) =>
         new Date(
@@ -124,6 +171,7 @@ function CalendarPage({ columns, onEditTask, isEditModalOpen }) {
   function goToToday() {
     const currentDate = new Date();
     setTodayDate(getDateTimeValue(currentDate));
+    setSelectedDate(null);
     setDisplayedMonth(
       new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
     );
@@ -208,12 +256,7 @@ function CalendarPage({ columns, onEditTask, isEditModalOpen }) {
                         date.getMonth() === displayedMonth.getMonth();
                       const dateTimeValue = getDateTimeValue(date);
                       const isToday = dateTimeValue === todayDate;
-                      const accessibleDate = new Intl.DateTimeFormat(undefined, {
-                        weekday: "long",
-                        month: "long",
-                        day: "numeric",
-                        year: "numeric",
-                      }).format(date);
+                      const accessibleDate = formatAccessibleDate(date);
                       const dueDateTasks = tasksByDueDate.get(dateTimeValue) || [];
                       const visibleTasks = dueDateTasks.slice(
                         0,
@@ -229,6 +272,7 @@ function CalendarPage({ columns, onEditTask, isEditModalOpen }) {
                             "calendar-day",
                             isCurrentMonth ? "" : "is-outside-month",
                             isToday ? "is-today" : "",
+                            selectedDate === dateTimeValue ? "is-selected" : "",
                           ]
                             .filter(Boolean)
                             .join(" ")}
@@ -236,41 +280,43 @@ function CalendarPage({ columns, onEditTask, isEditModalOpen }) {
                           aria-current={isToday ? "date" : undefined}
                           key={getDateTimeValue(date)}
                         >
-                          <time dateTime={getDateTimeValue(date)}>
-                            {date.getDate()}
-                          </time>
+                          <button
+                            className="calendar-day-select"
+                            type="button"
+                            aria-label={`Select ${accessibleDate}${
+                              dueDateTasks.length
+                                ? `, ${dueDateTasks.length} tasks`
+                                : ""
+                            }`}
+                            aria-pressed={selectedDate === dateTimeValue}
+                            onClick={() =>
+                              setSelectedDate((currentDate) =>
+                                currentDate === dateTimeValue
+                                  ? null
+                                  : dateTimeValue
+                              )
+                            }
+                          >
+                            <time dateTime={dateTimeValue}>
+                              {date.getDate()}
+                            </time>
+                          </button>
                           {dueDateTasks.length > 0 && (
                             <ul
                               className="calendar-task-list"
                               aria-label={`Tasks due ${accessibleDate}`}
                             >
-                              {visibleTasks.map((task) => {
-                                const status = task.status || "todo";
-                                const priority = task.priority.toLowerCase();
-                                const statusLabel =
-                                  taskStatusLabels[status] || "To Do";
-
-                                return (
-                                  <li key={task.id}>
-                                    <button
-                                      className={`calendar-task calendar-task--${status}`}
-                                      type="button"
-                                      aria-label={`${task.title}, ${statusLabel}, ${task.priority} priority, due ${dateTimeValue}. View task details`}
-                                      aria-haspopup="dialog"
-                                      onClick={() => setSelectedTaskId(task.id)}
-                                      title={`${task.title} - ${statusLabel} - ${task.priority} priority`}
-                                    >
-                                      <span className="calendar-task-title">
-                                        {task.title}
-                                      </span>
-                                      <span
-                                        className={`calendar-task-priority calendar-task-priority--${priority}`}
-                                        aria-hidden="true"
-                                      />
-                                    </button>
-                                  </li>
-                                );
-                              })}
+                              {visibleTasks.map((task) => (
+                                <li key={task.id}>
+                                  <CalendarTaskButton
+                                    task={task}
+                                    date={dateTimeValue}
+                                    onSelect={(selected) =>
+                                      setSelectedTaskId(selected.id)
+                                    }
+                                  />
+                                </li>
+                              ))}
                               {remainingTasks.length > 0 && (
                                 <li
                                   className="calendar-task-more"
@@ -297,6 +343,45 @@ function CalendarPage({ columns, onEditTask, isEditModalOpen }) {
           </table>
         </div>
       </section>
+      {selectedDate && (
+        <section
+          className="calendar-selected-day"
+          aria-labelledby="calendar-selected-day-title"
+          aria-live="polite"
+        >
+          <header className="calendar-selected-day-header">
+            <h2 id="calendar-selected-day-title">
+              Tasks for {selectedDateLabel}
+            </h2>
+            <button
+              type="button"
+              className="calendar-selected-day-close"
+              onClick={() => setSelectedDate(null)}
+              aria-label="Close selected date"
+            >
+              Close
+            </button>
+          </header>
+          {selectedDateTasks.length > 0 ? (
+            <ul className="calendar-selected-day-list">
+              {selectedDateTasks.map((task) => (
+                <li key={task.id}>
+                  <CalendarTaskButton
+                    task={task}
+                    date={selectedDate}
+                    compact={false}
+                    onSelect={(selected) => setSelectedTaskId(selected.id)}
+                  />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="calendar-selected-day-empty">
+              No tasks are scheduled for this date.
+            </p>
+          )}
+        </section>
+      )}
     </section>
     {selectedTask && (
       <CalendarTaskDetails

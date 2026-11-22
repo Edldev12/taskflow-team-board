@@ -516,6 +516,17 @@ describe("dashboard task statistics", () => {
     expect(
       firstDateCell.querySelector(".calendar-task--todo .calendar-task-priority--medium")
     ).toBeTruthy();
+    await user.click(
+      within(firstDateCell).getByRole("button", {
+        name: new RegExp(`Select ${dateLabel(15)}`),
+      })
+    );
+    const selectedDayPanel = screen.getByRole("region", {
+      name: `Tasks for ${dateLabel(15)}`,
+    });
+    expect(within(selectedDayPanel).getByText("Due task one")).toBeTruthy();
+    expect(within(selectedDayPanel).getByText("Due task two")).toBeTruthy();
+    expect(within(selectedDayPanel).getByText("Due task three")).toBeTruthy();
     const storedColumnsBeforeEdit = JSON.parse(
       localStorage.getItem("taskflow-team-board.columns")
     );
