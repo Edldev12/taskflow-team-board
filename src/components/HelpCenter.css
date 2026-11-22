@@ -384,6 +384,16 @@
   color: #9bcfff;
 }
 
+.app-layout[data-theme="dark"] .help-eyebrow,
+.app-layout[data-theme="dark"] .help-back-button:hover,
+.app-layout[data-theme="dark"] .help-delete-tip svg {
+  color: #9bcfff;
+}
+
+.app-layout[data-theme="dark"] .help-back-button:hover {
+  border-color: #72b7f5;
+}
+
 .app-layout[data-theme="dark"] .help-action-warning {
   border-color: #503b3b;
   background: #3a2c2d;

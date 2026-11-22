@@ -96,6 +96,10 @@
   font-size: 13px;
 }
 
+.app-layout[data-theme="dark"] .form-error {
+  color: #ffb5a9;
+}
+
 /* Modal buttons */
 .modal-actions {
   display: flex;

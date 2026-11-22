@@ -273,6 +273,82 @@ describe("dashboard task statistics", () => {
     ).toContain("following your device preference");
   });
 
+  it("switches the shared theme from the header icon controls", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+    const header = screen.getByRole("banner");
+    const darkModeButton = within(header).getByRole("button", {
+      name: "Dark mode",
+    });
+
+    await user.click(darkModeButton);
+    expect(container.querySelector(".app-layout").dataset.theme).toBe("dark");
+    expect(darkModeButton.getAttribute("aria-pressed")).toBe("true");
+    expect(localStorage.getItem("taskflow-team-board.theme")).toBe("dark");
+
+    await user.click(within(header).getByRole("button", { name: "Light mode" }));
+    expect(container.querySelector(".app-layout").dataset.theme).toBe("light");
+    expect(localStorage.getItem("taskflow-team-board.theme")).toBe("light");
+  });
+
+  it("counts task activity, shows it from the bell, and restores notifications", async () => {
+    const user = userEvent.setup();
+    const firstRender = render(<App />);
+
+    expect(
+      screen.getByRole("button", { name: "Notifications" }).querySelector(
+        ".notification-count"
+      )
+    ).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /add task/i }));
+    await user.type(screen.getByLabelText("Task Title *"), "Notification test task");
+    await user.click(screen.getByRole("button", { name: "Create Task" }));
+
+    const task = screen.getByRole("article", {
+      name: /Design landing page, To Do/,
+    });
+    await user.click(task);
+    await user.keyboard("{Enter}{ArrowRight}{Enter}");
+
+    const notificationButton = screen.getByRole("button", {
+      name: "Notifications, 2 unread",
+    });
+    expect(notificationButton.querySelector(".notification-count").textContent).toBe(
+      "2"
+    );
+
+    await user.click(notificationButton);
+    const notificationPanel = screen.getByRole("region", {
+      name: "Notifications",
+    });
+    expect(
+      within(notificationPanel).getByText(
+        "Design landing page moved from To Do to In Progress."
+      )
+    ).toBeTruthy();
+    expect(
+      within(notificationPanel).getByText(
+        "Task created: Notification test task."
+      )
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Notifications" }).querySelector(
+        ".notification-count"
+      )
+    ).toBeNull();
+    expect(
+      JSON.parse(localStorage.getItem("taskflow-team-board.notifications"))
+    ).toHaveLength(2);
+
+    firstRender.unmount();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Notifications" }));
+    expect(
+      screen.getByRole("region", { name: "Notifications" }).textContent
+    ).toContain("Design landing page moved from To Do to In Progress.");
+  });
+
   it("restores manual themes after refresh and keeps them across navigation", async () => {
     const user = userEvent.setup();
     const firstRender = render(<App />);

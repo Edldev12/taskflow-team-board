@@ -48,9 +48,40 @@ const taskColumns = [
 ];
 
 const TASK_COLUMNS_STORAGE_KEY = "taskflow-team-board.columns";
+const NOTIFICATIONS_STORAGE_KEY = "taskflow-team-board.notifications";
 const THEME_PREFERENCE_STORAGE_KEY =
   document.documentElement.dataset.themeStorageKey ||
   "taskflow-team-board.theme";
+
+function loadNotifications() {
+  try {
+    const savedNotifications = window.localStorage.getItem(
+      NOTIFICATIONS_STORAGE_KEY
+    );
+    if (savedNotifications === null) return [];
+
+    const parsedNotifications = JSON.parse(savedNotifications);
+    if (
+      !Array.isArray(parsedNotifications) ||
+      parsedNotifications.some(
+        (notification) =>
+          !notification ||
+          typeof notification.id !== "string" ||
+          typeof notification.message !== "string" ||
+          typeof notification.createdAt !== "string" ||
+          !Number.isFinite(Date.parse(notification.createdAt)) ||
+          typeof notification.read !== "boolean"
+      )
+    ) {
+      throw new Error("Saved notifications are invalid.");
+    }
+
+    return parsedNotifications.slice(0, 20);
+  } catch (error) {
+    console.error("Unable to restore saved notifications.", error);
+    return [];
+  }
+}
 
 function loadThemePreference() {
   const bootPreference = document.documentElement.dataset.themePreference;
@@ -238,6 +269,7 @@ function App() {
   );
   const [activePage, setActivePage] = useState("dashboard");
   const [columns, setColumns] = useState(loadTaskColumns);
+  const [notifications, setNotifications] = useState(loadNotifications);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dropTargetColumnId, setDropTargetColumnId] = useState(null);
@@ -351,6 +383,17 @@ function App() {
   }, [columns]);
 
   useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        NOTIFICATIONS_STORAGE_KEY,
+        JSON.stringify(notifications)
+      );
+    } catch (error) {
+      console.error("Unable to save notifications.", error);
+    }
+  }, [notifications]);
+
+  useEffect(() => {
     if (pendingKeyboardFocusTaskId.current === null) return;
 
     const taskId = String(pendingKeyboardFocusTaskId.current);
@@ -372,6 +415,46 @@ function App() {
     if (!saveApplicationPreferences(nextPreferences)) return false;
     setApplicationPreferences(nextPreferences);
     return true;
+  }
+
+  function addNotification(message) {
+    setNotifications((previousNotifications) => [
+      {
+        id: crypto.randomUUID(),
+        message,
+        createdAt: new Date().toISOString(),
+        read: false,
+      },
+      ...previousNotifications,
+    ].slice(0, 20));
+  }
+
+  function markNotificationsRead() {
+    setNotifications((previousNotifications) =>
+      previousNotifications.map((notification) =>
+        notification.read ? notification : { ...notification, read: true }
+      )
+    );
+  }
+
+  function recordTaskStatusChange(previousColumns, nextColumns, taskId) {
+    const previousColumn = previousColumns.find((column) =>
+      column.tasks.some((task) => String(task.id) === String(taskId))
+    );
+    const nextColumn = nextColumns.find((column) =>
+      column.tasks.some((task) => String(task.id) === String(taskId))
+    );
+
+    if (!previousColumn || !nextColumn || previousColumn.id === nextColumn.id) {
+      return;
+    }
+
+    const task = previousColumn.tasks.find(
+      (item) => String(item.id) === String(taskId)
+    );
+    addNotification(
+      `${task.title} moved from ${previousColumn.title} to ${nextColumn.title}.`
+    );
   }
 
   function announceTaskMovement(previousColumns, nextColumns, taskId) {
@@ -415,7 +498,7 @@ function App() {
 
   function saveTask(taskData) {
     if (selectedTask) {
-      // Update existing task
+      addNotification(`Task updated: ${taskData.title}.`);
       setColumns((previousColumns) =>
         previousColumns.map((column) => ({
           ...column,
@@ -434,6 +517,7 @@ function App() {
         status: "todo",
       };
 
+      addNotification(`Task created: ${newTask.title}.`);
       setColumns((previousColumns) =>
         previousColumns.map((column) =>
           column.id === "todo"
@@ -452,6 +536,13 @@ function App() {
     );
 
     if (!confirmed) return;
+
+    const deletedTask = columns
+      .flatMap((column) => column.tasks)
+      .find((task) => task.id === taskId);
+    if (deletedTask) {
+      addNotification(`Task deleted: ${deletedTask.title}.`);
+    }
 
     setColumns((previousColumns) =>
       previousColumns.map((column) => ({
@@ -546,6 +637,7 @@ function App() {
           if (nextColumns !== columns) {
             setColumns(nextColumns);
             announceTaskMovement(columns, nextColumns, taskId);
+            recordTaskStatusChange(columns, nextColumns, taskId);
           }
         }
       }
@@ -606,6 +698,7 @@ function App() {
         pendingKeyboardFocusTaskId.current = keyboardMove.taskId;
         setColumns(nextColumns);
         announceTaskMovement(columns, nextColumns, keyboardMove.taskId);
+        recordTaskStatusChange(columns, nextColumns, keyboardMove.taskId);
       }
 
       setKeyboardMove(null);
@@ -751,24 +844,6 @@ function App() {
         </nav>
 
         <div className="sidebar-bottom">
-          <div className="theme-switch">
-            <button
-              className={theme === "light" ? "theme-option selected" : "theme-option"}
-              onClick={() => toggleTheme("light")}
-              aria-pressed={theme === "light"}
-            >
-              ☀ Light
-            </button>
-
-            <button
-              className={theme === "dark" ? "theme-option selected" : "theme-option"}
-              onClick={() => toggleTheme("dark")}
-              aria-pressed={theme === "dark"}
-            >
-              ☾ Dark
-            </button>
-          </div>
-
           <div className="sidebar-profile">
             <div
               className="profile-avatar"
@@ -785,7 +860,13 @@ function App() {
       </aside>
 
       <main className="main-layout">
-        <Header profile={profile} />
+        <Header
+          profile={profile}
+          theme={theme}
+          onThemeChange={toggleTheme}
+          notifications={notifications}
+          onNotificationsRead={markNotificationsRead}
+        />
 
         {activePage === "help" ? (
           <HelpCenter onReturnToDashboard={() => setActivePage("dashboard")} />
