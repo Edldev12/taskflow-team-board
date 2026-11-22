@@ -83,6 +83,7 @@ function CalendarPage({ columns, onEditTask, isEditModalOpen }) {
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const headingRef = useRef(null);
+  const selectedDayRef = useRef(null);
   const monthLabel = getMonthLabel(displayedMonth);
   const dates = useMemo(() => {
     const firstOfMonth = new Date(
@@ -136,6 +137,15 @@ function CalendarPage({ columns, onEditTask, isEditModalOpen }) {
   useEffect(() => {
     headingRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (selectedDate) {
+      selectedDayRef.current?.scrollIntoView?.({
+        block: "end",
+        behavior: "instant",
+      });
+    }
+  }, [selectedDate]);
 
   useEffect(() => {
     function updateTodayDate() {
@@ -318,18 +328,25 @@ function CalendarPage({ columns, onEditTask, isEditModalOpen }) {
                                 </li>
                               ))}
                               {remainingTasks.length > 0 && (
-                                <li
-                                  className="calendar-task-more"
-                                  aria-label={`${
-                                    remainingTasks.length
-                                  } more tasks: ${remainingTasks
-                                    .map((task) => task.title)
-                                    .join(", ")}`}
-                                  title={remainingTasks
-                                    .map((task) => task.title)
-                                    .join(", ")}
-                                >
-                                  + {remainingTasks.length} more
+                                <li>
+                                  <button
+                                    className="calendar-task-more"
+                                    type="button"
+                                    aria-label={`Show ${remainingTasks.length} more ${
+                                      remainingTasks.length === 1 ? "task" : "tasks"
+                                    } for ${accessibleDate}`}
+                                    aria-expanded={
+                                      selectedDate === dateTimeValue
+                                    }
+                                    onClick={() =>
+                                      setSelectedDate(dateTimeValue)
+                                    }
+                                    title={remainingTasks
+                                      .map((task) => task.title)
+                                      .join(", ")}
+                                  >
+                                    + {remainingTasks.length} more
+                                  </button>
                                 </li>
                               )}
                             </ul>
@@ -345,6 +362,7 @@ function CalendarPage({ columns, onEditTask, isEditModalOpen }) {
       </section>
       {selectedDate && (
         <section
+          ref={selectedDayRef}
           className="calendar-selected-day"
           aria-labelledby="calendar-selected-day-title"
           aria-live="polite"

@@ -780,16 +780,32 @@ describe("dashboard task statistics", () => {
     expect(within(firstDateCell).getByText("Due task one")).toBeTruthy();
     expect(within(firstDateCell).getByText("Due task two")).toBeTruthy();
     expect(within(firstDateCell).queryByText("Due task three")).toBeNull();
-    expect(within(firstDateCell).getByText("+ 1 more")).toBeTruthy();
+    const showMoreButton = within(firstDateCell).getByRole("button", {
+      name: `Show 1 more task for ${dateLabel(15)}`,
+    });
+    expect(showMoreButton.getAttribute("aria-expanded")).toBe("false");
     expect(
       firstDateCell.querySelector(".calendar-task--todo .calendar-task-priority--medium")
     ).toBeTruthy();
+
+    await user.click(showMoreButton);
+    let selectedDayPanel = screen.getByRole("region", {
+      name: `Tasks for ${dateLabel(15)}`,
+    });
+    expect(showMoreButton.getAttribute("aria-expanded")).toBe("true");
+    expect(within(selectedDayPanel).getByText("Due task three")).toBeTruthy();
+    await user.click(
+      within(selectedDayPanel).getByRole("button", {
+        name: "Close selected date",
+      })
+    );
+
     await user.click(
       within(firstDateCell).getByRole("button", {
         name: new RegExp(`Select ${dateLabel(15)}`),
       })
     );
-    const selectedDayPanel = screen.getByRole("region", {
+    selectedDayPanel = screen.getByRole("region", {
       name: `Tasks for ${dateLabel(15)}`,
     });
     expect(within(selectedDayPanel).getByText("Due task one")).toBeTruthy();
