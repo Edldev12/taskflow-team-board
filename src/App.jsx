@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Header from "./components/Header";
 import TaskColumn from "./components/TaskColumn";
+import TaskStatsCard from "./components/TaskStatsCard";
 import "./App.css";
 import TaskModal from "./components/TaskModal";
 
@@ -204,6 +205,10 @@ function App() {
   const pendingKeyboardFocusTaskId = useRef(null);
   const lastTaskAnnouncementRef = useRef(null);
   const [selectedTask, setSelectedTask] = useState(null);
+  const totalTaskCount = columns.reduce(
+    (total, column) => total + column.tasks.length,
+    0
+  );
 
   useEffect(() => {
     if (!taskAnnouncement) return;
@@ -640,6 +645,8 @@ function App() {
               <span>+</span> Add Task
             </button>
           </div>
+
+          <TaskStatsCard totalTasks={totalTaskCount} />
 
           {/*
           <div className="task-board">

@@ -188,6 +188,44 @@
   font-size: 14px;
 }
 
+.task-stats-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: fit-content;
+  min-width: 190px;
+  padding: 16px 20px;
+  margin-bottom: 22px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(38, 55, 74, 0.04);
+}
+
+.task-stats-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  place-items: center;
+  border-radius: 10px;
+  background: #eaf4ff;
+  color: #2876bd;
+}
+
+.task-stats-card p {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.task-stats-card strong {
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+}
+
 .add-task-button {
   display: flex;
   align-items: center;
@@ -419,6 +457,11 @@
 }
 
 .app-layout[data-theme="dark"] .brand-icon {
+  background: #30465e;
+  color: #9bcfff;
+}
+
+.app-layout[data-theme="dark"] .task-stats-icon {
   background: #30465e;
   color: #9bcfff;
 }
