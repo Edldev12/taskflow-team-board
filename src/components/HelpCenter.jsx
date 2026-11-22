@@ -14,6 +14,7 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
+import HelpDragDropGuide from "./HelpDragDropGuide";
 import "./HelpCenter.css";
 
 const creationSteps = [
@@ -237,6 +238,8 @@ function HelpCenter({ onReturnToDashboard }) {
           </article>
         </div>
       </section>
+
+      <HelpDragDropGuide />
 
       <section className="help-fields-section" aria-labelledby="task-fields-title">
         <div className="help-section-heading">

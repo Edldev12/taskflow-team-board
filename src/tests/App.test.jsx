@@ -160,6 +160,9 @@ describe("dashboard task statistics", () => {
     expect(
       screen.getByRole("heading", { name: "How to Edit and Delete Tasks" })
     ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "How to Use Drag and Drop" })
+    ).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Edit a task" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Delete a task" })).toBeTruthy();
     expect(
@@ -171,6 +174,8 @@ describe("dashboard task statistics", () => {
     expect(screen.getByText(/Status is not selected in the creation form/i)).toBeTruthy();
     expect(screen.getByText(/choose OK to remove the task or Cancel to keep it/i)).toBeTruthy();
     expect(screen.getByText(/Deletion has no undo in this app/i)).toBeTruthy();
+    expect(screen.getByText(/If a drop is not accepted, the task stays where it was/i)).toBeTruthy();
+    expect(screen.getByText(/Reorder tasks in a column/i)).toBeTruthy();
 
     await user.click(
       screen.getByRole("button", { name: "Return to Dashboard" })
