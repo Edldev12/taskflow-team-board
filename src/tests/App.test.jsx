@@ -570,6 +570,63 @@ describe("dashboard task statistics", () => {
     ).toBeNull();
   });
 
+  it("filters My Tasks by status and priority together and clears unmatched filters", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+
+    const myTasksPage = screen.getByRole("region", { name: "My Tasks" });
+    const statusFilter = within(myTasksPage).getByLabelText("Status");
+    const priorityFilter = within(myTasksPage).getByLabelText("Priority");
+
+    expect(
+      within(priorityFilter).getAllByRole("option").map((option) => option.value)
+    ).toEqual(["all", "Low", "Medium", "High"]);
+
+    await user.selectOptions(statusFilter, "done");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(3);
+    expect(within(myTasksPage).getByText("Showing 3 of 10 tasks")).toBeTruthy();
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Set up React project, Done",
+      })
+    ).toBeTruthy();
+
+    await user.selectOptions(statusFilter, "all");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(10);
+
+    await user.selectOptions(statusFilter, "in-progress");
+    await user.selectOptions(priorityFilter, "High");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(2);
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Build dashboard interface, In Progress",
+      })
+    ).toBeTruthy();
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Develop task components, In Progress",
+      })
+    ).toBeTruthy();
+    expect(within(myTasksPage).getByText("Showing 2 of 10 tasks")).toBeTruthy();
+
+    await user.selectOptions(priorityFilter, "Low");
+    expect(
+      within(myTasksPage).getByRole("heading", {
+        name: "No tasks match these filters",
+      })
+    ).toBeTruthy();
+    expect(within(myTasksPage).getByText("Showing 0 of 10 tasks")).toBeTruthy();
+
+    await user.click(
+      within(myTasksPage).getByRole("button", { name: "Clear Filters" })
+    );
+    expect(statusFilter.value).toBe("all");
+    expect(priorityFilter.value).toBe("all");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(10);
+  });
+
   it("shows an empty state when all shared task columns are empty", async () => {
     localStorage.setItem(
       "taskflow-team-board.columns",

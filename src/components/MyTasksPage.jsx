@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { CalendarDays, Inbox, ListTodo } from "lucide-react";
 import { isValidDueDate } from "../utils/taskDates";
 import "./MyTasksPage.css";
@@ -8,6 +8,8 @@ const taskStatusLabels = {
   "in-progress": "In Progress",
   done: "Done",
 };
+
+const taskPriorities = ["Low", "Medium", "High"];
 
 function formatDueDate(dueDate) {
   if (!isValidDueDate(dueDate)) return "";
@@ -36,6 +38,19 @@ function MyTasksPage({
       ),
     [columns]
   );
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const filteredTasks = useMemo(
+    () =>
+      tasks.filter(
+        ({ task, statusId }) =>
+          (statusFilter === "all" || statusId === statusFilter) &&
+          (priorityFilter === "all" || task.priority === priorityFilter)
+      ),
+    [priorityFilter, statusFilter, tasks]
+  );
+  const hasActiveFilters =
+    statusFilter !== "all" || priorityFilter !== "all";
 
   return (
     <section
@@ -82,75 +97,154 @@ function MyTasksPage({
           <p>Create a task to see it here.</p>
         </div>
       ) : (
-        <div className="my-task-grid">
-          {tasks.map(({ task, status, statusId }) => {
-            const priority = task.priority || "Priority not set";
-            const priorityClass = task.priority?.toLowerCase();
-            const dueDate = isValidDueDate(task.dueDate)
-              ? formatDueDate(task.dueDate)
-              : "";
-
-            return (
-              <article
-                className="my-task-card"
-                key={task.id}
-                aria-label={`${task.title}, ${status}`}
+        <>
+          <div className="my-task-filter-toolbar">
+            <div
+              className="my-task-filter-fields"
+              role="group"
+              aria-label="Task filters"
+            >
+              <label
+                className="my-task-filter-field"
+                htmlFor="my-tasks-status-filter"
               >
-                <div className="my-task-card-heading">
-                  <h2>{task.title}</h2>
-                  <span
-                    className={`my-task-status my-task-status--${statusId}`}
-                  >
-                    {status}
-                  </span>
-                </div>
+                <span>Status</span>
+                <select
+                  id="my-tasks-status-filter"
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                >
+                  <option value="all">All Statuses</option>
+                  {columns.map((column) => (
+                    <option key={column.id} value={column.id}>
+                      {column.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-                <p className="my-task-description">
-                  {task.description || "No description provided."}
-                </p>
+              <label
+                className="my-task-filter-field"
+                htmlFor="my-tasks-priority-filter"
+              >
+                <span>Priority</span>
+                <select
+                  id="my-tasks-priority-filter"
+                  value={priorityFilter}
+                  onChange={(event) => setPriorityFilter(event.target.value)}
+                >
+                  <option value="all">All Priorities</option>
+                  {taskPriorities.map((priority) => (
+                    <option key={priority} value={priority}>
+                      {priority}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
 
-                <div className="my-task-tags">
-                  <span className="task-label">{task.label || "No label"}</span>
-                  <span
-                    className={`priority${
-                      priorityClass ? ` ${priorityClass}` : ""
-                    }`}
-                  >
-                    {priority}
-                  </span>
-                </div>
+            <div className="my-task-filter-summary">
+              <p
+                className="my-task-results-count"
+                role="status"
+                aria-live="polite"
+              >
+                Showing {filteredTasks.length} of {tasks.length}{" "}
+                {tasks.length === 1 ? "task" : "tasks"}
+              </p>
+              <button
+                className="my-task-clear-filters"
+                type="button"
+                onClick={() => {
+                  setStatusFilter("all");
+                  setPriorityFilter("all");
+                }}
+                disabled={!hasActiveFilters}
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
 
-                {dueDate && (
-                  <div className="my-task-due-date">
-                    <CalendarDays size={15} aria-hidden="true" />
-                    <time dateTime={task.dueDate}>Due {dueDate}</time>
-                  </div>
-                )}
+          {filteredTasks.length === 0 ? (
+            <div className="my-tasks-no-results">
+              <h2>No tasks match these filters</h2>
+              <p>Change your filters or clear them to see all tasks.</p>
+            </div>
+          ) : (
+            <div className="my-task-grid">
+              {filteredTasks.map(({ task, status, statusId }) => {
+                const priority = task.priority || "Priority not set";
+                const priorityClass = task.priority?.toLowerCase();
+                const dueDate = isValidDueDate(task.dueDate)
+                  ? formatDueDate(task.dueDate)
+                  : "";
 
-                <div className="task-card-actions my-task-actions">
-                  <button
-                    type="button"
-                    className="task-edit-button"
-                    onClick={(event) =>
-                      onEditTask(task, event.currentTarget)
-                    }
-                    aria-label={`Edit ${task.title}`}
+                return (
+                  <article
+                    className="my-task-card"
+                    key={task.id}
+                    aria-label={`${task.title}, ${status}`}
                   >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="task-delete-button"
-                    onClick={() => onDeleteTask(task.id)}
-                    aria-label={`Delete ${task.title}`}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+                    <div className="my-task-card-heading">
+                      <h2>{task.title}</h2>
+                      <span
+                        className={`my-task-status my-task-status--${statusId}`}
+                      >
+                        {status}
+                      </span>
+                    </div>
+
+                    <p className="my-task-description">
+                      {task.description || "No description provided."}
+                    </p>
+
+                    <div className="my-task-tags">
+                      <span className="task-label">
+                        {task.label || "No label"}
+                      </span>
+                      <span
+                        className={`priority${
+                          priorityClass ? ` ${priorityClass}` : ""
+                        }`}
+                      >
+                        {priority}
+                      </span>
+                    </div>
+
+                    {dueDate && (
+                      <div className="my-task-due-date">
+                        <CalendarDays size={15} aria-hidden="true" />
+                        <time dateTime={task.dueDate}>Due {dueDate}</time>
+                      </div>
+                    )}
+
+                    <div className="task-card-actions my-task-actions">
+                      <button
+                        type="button"
+                        className="task-edit-button"
+                        onClick={(event) =>
+                          onEditTask(task, event.currentTarget)
+                        }
+                        aria-label={`Edit ${task.title}`}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="task-delete-button"
+                        onClick={() => onDeleteTask(task.id)}
+                        aria-label={`Delete ${task.title}`}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </section>
   );
