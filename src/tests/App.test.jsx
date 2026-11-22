@@ -1225,9 +1225,7 @@ describe("dashboard task statistics", () => {
     expect(
       within(profileSection).getByText("ada@example.com")
     ).toBeTruthy();
-    expect(
-      container.querySelector(".sidebar-profile-info strong").textContent
-    ).toBe("Ada Lovelace");
+    expect(container.querySelector(".sidebar-profile")).toBeNull();
     expect(
       container.querySelector(".header-profile .profile-avatar").textContent
     ).toContain("AL");

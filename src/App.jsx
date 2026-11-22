@@ -898,20 +898,6 @@ function App() {
           </a>
         </nav>
 
-        <div className="sidebar-bottom">
-          <div className="sidebar-profile">
-            <div
-              className="profile-avatar"
-              role="img"
-              aria-label={`${profile.initials} profile initials`}
-            >
-              {profile.initials}
-            </div>
-            <div className="sidebar-profile-info">
-              <strong>{profile.fullName}</strong>
-            </div>
-          </div>
-        </div>
       </aside>
 
       <main className="main-layout">
