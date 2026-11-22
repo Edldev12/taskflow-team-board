@@ -1,5 +1,6 @@
 
 import { useEffect, useRef, useState } from "react";
+import { CircleCheck, ListTodo } from "lucide-react";
 import Header from "./components/Header";
 import TaskColumn from "./components/TaskColumn";
 import TaskStatsCard from "./components/TaskStatsCard";
@@ -207,6 +208,11 @@ function App() {
   const [selectedTask, setSelectedTask] = useState(null);
   const totalTaskCount = columns.reduce(
     (total, column) => total + column.tasks.length,
+    0
+  );
+  const completedTaskCount = columns.reduce(
+    (total, column) =>
+      column.id === "done" ? total + column.tasks.length : total,
     0
   );
 
@@ -646,7 +652,19 @@ function App() {
             </button>
           </div>
 
-          <TaskStatsCard totalTasks={totalTaskCount} />
+          <div className="task-stats-grid">
+            <TaskStatsCard
+              label="Total Tasks"
+              count={totalTaskCount}
+              icon={ListTodo}
+            />
+            <TaskStatsCard
+              label="Completed Tasks"
+              count={completedTaskCount}
+              icon={CircleCheck}
+              variant="completed"
+            />
+          </div>
 
           {/*
           <div className="task-board">

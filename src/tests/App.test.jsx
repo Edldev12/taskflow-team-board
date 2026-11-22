@@ -17,7 +17,7 @@ describe("dashboard task statistics", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    const totalTasks = screen.getByRole("group", { name: "Total tasks" });
+    const totalTasks = screen.getByRole("group", { name: "Total Tasks" });
     expect(totalTasks.textContent).toContain("10");
 
     await user.click(screen.getByRole("button", { name: /add task/i }));
@@ -30,5 +30,29 @@ describe("dashboard task statistics", () => {
     await user.click(screen.getByRole("button", { name: "Delete Design landing page" }));
 
     expect(totalTasks.textContent).toContain("10");
+  });
+
+  it("updates the completed count when tasks move into and out of Done", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const completedTasks = screen.getByRole("group", {
+      name: "Completed Tasks",
+    });
+    expect(completedTasks.textContent).toContain("3");
+
+    let task = screen.getByRole("article", {
+      name: /Design landing page, To Do/,
+    });
+    await user.click(task);
+    await user.keyboard("{Enter}{ArrowRight}{ArrowRight}{Enter}");
+    expect(completedTasks.textContent).toContain("4");
+
+    task = screen.getByRole("article", {
+      name: /Design landing page, Done/,
+    });
+    await user.click(task);
+    await user.keyboard("{Enter}{ArrowLeft}{ArrowLeft}{Enter}");
+    expect(completedTasks.textContent).toContain("3");
   });
 });

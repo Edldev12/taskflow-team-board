@@ -1,14 +1,18 @@
 import { ListTodo } from "lucide-react";
 
-function TaskStatsCard({ totalTasks }) {
+function TaskStatsCard({ label, count, icon: Icon = ListTodo, variant }) {
   return (
-    <section className="task-stats-card" role="group" aria-label="Total tasks">
+    <section
+      className={`task-stats-card${variant ? ` task-stats-card--${variant}` : ""}`}
+      role="group"
+      aria-label={label}
+    >
       <div className="task-stats-icon" aria-hidden="true">
-        <ListTodo size={23} strokeWidth={1.8} />
+        <Icon size={23} strokeWidth={1.8} />
       </div>
       <div>
-        <p>Total Tasks</p>
-        <strong>{totalTasks}</strong>
+        <p>{label}</p>
+        <strong>{count}</strong>
       </div>
     </section>
   );
