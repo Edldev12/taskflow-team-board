@@ -143,4 +143,33 @@ describe("dashboard task statistics", () => {
     expect(completedTasks.textContent).toContain("0");
     expect(pendingTasks.textContent).toContain("0");
   });
+
+  it("opens the task creation guide from Help and returns to the dashboard", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("link", { name: /Help/ }));
+
+    const helpHeading = screen.getByRole("heading", {
+      name: "Help Center",
+    });
+    expect(document.activeElement).toBe(helpHeading);
+    expect(
+      screen.getByRole("heading", { name: "How to Create Tasks" })
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Required. Keep it under 100 characters and make the action clear."
+      )
+    ).toBeTruthy();
+    expect(screen.getByText(/free text/i)).toBeTruthy();
+    expect(screen.getByText(/Status is not selected in the creation form/i)).toBeTruthy();
+
+    await user.click(
+      screen.getByRole("button", { name: "Return to Dashboard" })
+    );
+
+    expect(screen.getByRole("heading", { name: "My Tasks" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /add task/i })).toBeTruthy();
+  });
 });
