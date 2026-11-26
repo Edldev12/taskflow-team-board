@@ -61,7 +61,7 @@ const editSteps = [
   {
     title: "Update its details",
     description:
-      "Change the title, description, due date, priority, or label. Status is not edited in this form; move the task between board columns instead.",
+      "Change the title, description, status, due date, priority, or label in the Edit Task form.",
   },
   {
     title: "Save or cancel",
@@ -193,8 +193,8 @@ function HelpCenter({ onReturnToDashboard }) {
             <aside className="help-action-tip">
               <ShieldCheck size={18} aria-hidden="true" />
               <p>
-                Check the task title before saving. To change its status, move
-                its card to another column.
+                Check the task title before saving. You can also change the
+                status by moving its card to another column.
               </p>
             </aside>
           </article>
