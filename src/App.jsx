@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import CalendarPage from "./components/CalendarPage";
 import Header from "./components/Header";
 import HelpCenter from "./components/HelpCenter";
+import MyTasksPage from "./components/MyTasksPage";
 import SettingsPage from "./components/SettingsPage";
 import TaskColumn from "./components/TaskColumn";
 import YourProgressPage from "./components/YourProgressPage";
@@ -330,6 +331,8 @@ function App() {
   const [activePage, setActivePage] = useState("dashboard");
   const [columns, setColumns] = useState(loadTaskColumns);
   const [initialSavedColumns] = useState(loadTasks);
+
+  const [taskSearchQuery, setTaskSearchQuery] = useState("");
 
   const [defaultTaskDueDate, setDefaultTaskDueDate] = useState("");
   const [notifications, setNotifications] = useState(loadNotifications);
@@ -674,37 +677,51 @@ function App() {
     setIsModalOpen(false);
     setSelectedTask(null);
   }
-
   async function saveTask(taskData) {
     const previousColumns = columns;
 
     if (selectedTask) {
-      const updatedTask = {
-        ...selectedTask,
-        ...taskData,
-      };
+      const sourceColumn = columns.find((column) =>
+        column.tasks.some(
+          (task) => String(task.id) === String(selectedTask.id)
+        )
+      );
 
-      const nextColumns = previousColumns.map((column) => ({
+      const destinationColumn = columns.find(
+        (column) => column.id === taskData.status
+      );
+
+      const updatedColumns = columns.map((column) => ({
         ...column,
         tasks: column.tasks.map((task) =>
           String(task.id) === String(selectedTask.id)
-            ? updatedTask
+            ? { ...task, ...taskData }
             : task
         ),
       }));
 
+      const nextColumns =
+        sourceColumn &&
+        destinationColumn &&
+        sourceColumn.id !== destinationColumn.id
+          ? moveTaskToPosition(
+              updatedColumns,
+              selectedTask.id,
+              destinationColumn.id,
+              destinationColumn.tasks.length
+            )
+          : updatedColumns;
+
+      recordTaskStatusChange(columns, nextColumns, selectedTask.id);
       setColumns(nextColumns);
       closeModal();
 
       try {
         await updateTask(selectedTask.id, taskData);
-
-        addNotification(`Task updated: ${updatedTask.title}.`);
+        addNotification(`Task updated: ${taskData.title}.`);
       } catch (error) {
         console.error("Task update failed.", error);
-
         setColumns(previousColumns);
-
         addNotification(
           `Task update failed: ${error.message || "Please try again."}`
         );
@@ -733,21 +750,19 @@ function App() {
 
     setColumns(nextColumns);
     closeModal();
-
     addNotification(`Task created: ${newTask.title}.`);
 
     try {
       await createTask(newTask);
     } catch (error) {
       console.error("Task creation failed.", error);
-
       setColumns(previousColumns);
-
       addNotification(
         `Task creation failed: ${error.message || "Please try again."}`
       );
     }
   }
+ 
 
   async function deleteTask(taskId) {
     const confirmed = window.confirm(
@@ -1158,6 +1173,7 @@ function App() {
           </a>
         </nav>
 
+
         <div className="sidebar-bottom">
           <div className="sidebar-profile">
             <div
@@ -1173,6 +1189,7 @@ function App() {
             </div>
           </div>
         </div>
+
       </aside>
 
       <main className="main-layout">
@@ -1180,6 +1197,8 @@ function App() {
           profile={profile}
           theme={theme}
           onThemeChange={toggleTheme}
+          searchQuery={taskSearchQuery}
+          onSearchQueryChange={setTaskSearchQuery}
           notifications={notifications}
           onNotificationsRead={markNotificationsRead}
         />
@@ -1212,6 +1231,16 @@ function App() {
             columns={columns}
             onEditTask={openEditModal}
             isEditModalOpen={isModalOpen}
+          />
+        ) : activePage === "my-tasks" ? (
+          <MyTasksPage
+            columns={columns}
+            searchQuery={taskSearchQuery}
+            onSearchQueryChange={setTaskSearchQuery}
+            onCreateTask={openCreateModal}
+            onEditTask={openEditModal}
+            onDeleteTask={deleteTask}
+            createButtonRef={triggerRef}
           />
         ) : (
           <section className="dashboard-content" id="dashboard">

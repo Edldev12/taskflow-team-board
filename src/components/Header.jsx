@@ -1,4 +1,4 @@
-import { Bell, Moon, Sun } from "lucide-react";
+import { Bell, Moon, Sun, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import "./Header.css";
 
@@ -6,6 +6,8 @@ function Header({
   profile,
   theme,
   onThemeChange,
+  searchQuery,
+  onSearchQueryChange,
   notifications,
   onNotificationsRead,
 }) {
@@ -49,9 +51,25 @@ function Header({
 
   return (
     <header className="top-header">
-      <div className="header-search">
+      <div className="header-search" role="search" aria-label="Task search">
         <span className="search-icon">⌕</span>
-        <input type="search" placeholder="Search tasks..." aria-label="Search tasks" />
+        <input
+          type="search"
+          placeholder="Search tasks..."
+          aria-label="Search tasks"
+          value={searchQuery}
+          onChange={(event) => onSearchQueryChange(event.target.value)}
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            className="header-search-clear"
+            aria-label="Clear task search"
+            onClick={() => onSearchQueryChange("")}
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       <div className="header-actions">

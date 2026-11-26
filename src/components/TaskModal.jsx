@@ -3,6 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { isValidDueDate } from "../utils/taskDates";
 import "./TaskModal.css";
 
+const taskStatuses = [
+  { value: "todo", label: "To Do" },
+  { value: "in-progress", label: "In Progress" },
+  { value: "done", label: "Done" },
+];
+
 function TaskModal({
   isOpen,
   onClose,
@@ -15,6 +21,7 @@ function TaskModal({
     title: task?.title || "",
     description: task?.description || "",
     dueDate: task?.dueDate || defaultDueDate,
+    status: task?.status || "todo",
     priority: task?.priority || "Medium",
     label: task?.label || "",
   }));
@@ -91,6 +98,14 @@ function TaskModal({
 
     if (title.length > 100) {
       setError("Task title must be 100 characters or fewer.");
+      return;
+    }
+
+    if (
+      isEditing &&
+      !taskStatuses.some((status) => status.value === formData.status)
+    ) {
+      setError("Select a valid task status.");
       return;
     }
 
@@ -185,6 +200,25 @@ function TaskModal({
               required
             />
           </div>
+
+          {isEditing && (
+            <div className="form-group">
+              <label htmlFor="task-status">Status</label>
+              <select
+                id="task-status"
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                required
+              >
+                {taskStatuses.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="form-group">
             <label htmlFor="task-priority">Priority</label>

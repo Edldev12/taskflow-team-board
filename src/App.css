@@ -111,41 +111,6 @@
   background: var(--border);
 }
 
-.sidebar-bottom {
-  margin-top: auto;
-  padding-top: 25px;
-}
-
-.sidebar-profile {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 15px 5px 0;
-  border-top: 1px solid var(--border);
-}
-
-.sidebar-profile-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.sidebar-profile-info strong {
-  color: var(--text);
-  font-size: 13px;
-}
-
-.sidebar-profile-info span {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.sidebar-profile-info strong,
-.sidebar-profile-info span {
-  max-width: 145px;
-  overflow-wrap: anywhere;
-}
-
 /* Main dashboard */
 .main-layout {
   min-width: 0;
@@ -615,6 +580,10 @@
 }
 
 .task-card-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   padding: 6px 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -760,28 +729,6 @@
   .nav-icon {
     width: auto;
     font-size: 15px;
-  }
-
-  .sidebar-bottom {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding-top: 12px;
-  }
-
-  .sidebar-profile {
-    padding: 0;
-    border: none;
-  }
-
-  .sidebar-profile .profile-avatar {
-    width: 34px;
-    height: 34px;
-  }
-
-  .sidebar-profile-info {
-    display: none;
   }
 
   .dashboard-content {

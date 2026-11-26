@@ -280,12 +280,34 @@
 }
 
 .calendar-task-more {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 2px 3px;
   overflow: hidden;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
   color: #2876bd;
+  font: inherit;
   font-size: 10px;
   font-weight: 600;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.calendar-task-more:hover {
+  background: #eaf4ff;
+}
+
+.calendar-task-more:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 3px solid #2876bd;
+  outline-offset: 1px;
 }
 
 .calendar-selected-day {
@@ -369,6 +391,10 @@
 
 .app-layout[data-theme="dark"] .calendar-task-more {
   color: #9bcfff;
+}
+
+.app-layout[data-theme="dark"] .calendar-task-more:hover {
+  background: #30465e;
 }
 
 .app-layout[data-theme="dark"] .calendar-month-button:hover {
@@ -465,6 +491,7 @@
   }
 
   .calendar-task-more {
+    min-height: 36px;
     font-size: 9px;
   }
 

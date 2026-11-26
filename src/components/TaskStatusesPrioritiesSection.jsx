@@ -119,8 +119,9 @@ function TaskStatusesPrioritiesSection() {
           <div>
             <h3>Change a task’s status</h3>
             <p>
-              Drag its card to another column, or use the keyboard move controls.
-              When it lands in a different column, its status updates to match.
+              Choose a status in the Edit Task form, drag its card to another
+              column, or use the keyboard move controls. When it lands in a
+              different column, its status updates to match.
             </p>
           </div>
         </aside>

@@ -30,7 +30,7 @@ const faqItems = [
     icon: Pencil,
     question: "How can I edit an existing task?",
     answer:
-      "Find the task card and select its Edit button. Update the title, description, due date, priority, or label, then select Save Changes. Status is changed by moving the card between columns, not in the edit form.",
+      "Find the task card and select its Edit button. Update the title, description, status, due date, priority, or label, then select Save Changes. You can also change status by moving the card between columns.",
   },
   {
     id: "delete-task",
@@ -51,7 +51,7 @@ const faqItems = [
     icon: CircleCheck,
     question: "What do To Do, In Progress, and Done mean?",
     answer:
-      "To Do is planned work that has not started. In Progress is work currently underway. Done is completed work. Move a card to the matching column to update its status.",
+      "To Do is planned work that has not started. In Progress is work currently underway. Done is completed work. Select a status in the Edit Task form or move the card to the matching column.",
   },
   {
     id: "task-priorities",
@@ -65,7 +65,7 @@ const faqItems = [
     icon: Search,
     question: "How can I search for a particular task?",
     answer:
-      "The header displays a Search tasks field, but it is not currently connected to task filtering. There is no in-app task search yet; you can locate a task by checking its board column.",
+      "Use the Search tasks field in the top navigation while viewing My Tasks. It searches task titles, descriptions, and labels, is case-insensitive, and works together with the status and priority filters.",
   },
   {
     id: "filter-labels",

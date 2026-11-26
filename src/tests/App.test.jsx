@@ -468,7 +468,7 @@ describe("dashboard task statistics", () => {
     ).toBeTruthy();
   });
 
-  it("navigates between Dashboard and the My Tasks board", async () => {
+  it("navigates between Dashboard and My Tasks", async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -490,6 +490,250 @@ describe("dashboard task statistics", () => {
     expect(
       screen.getByRole("link", { name: /My Tasks/ }).getAttribute("aria-current")
     ).toBeNull();
+  });
+
+  it("shows all shared tasks and reflects create, edit, and delete changes", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<App />);
+
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+
+    let myTasksPage = screen.getByRole("region", { name: "My Tasks" });
+    expect(
+      within(myTasksPage).getByRole("group", { name: "Total Tasks" }).textContent
+    ).toContain("10");
+    const initialTask = within(myTasksPage).getByRole("article", {
+      name: "Design landing page, To Do",
+    });
+    expect(within(initialTask).getByText("No description provided.")).toBeTruthy();
+    expect(within(initialTask).getByText("To Do")).toBeTruthy();
+    expect(within(initialTask).getByText("Design")).toBeTruthy();
+    expect(within(initialTask).getByText("High")).toBeTruthy();
+    expect(initialTask.querySelector("time")?.getAttribute("dateTime")).toMatch(
+      /^\d{4}-\d{2}-\d{2}$/
+    );
+
+    await user.click(within(myTasksPage).getByRole("button", { name: "Add Task" }));
+    await user.type(screen.getByLabelText("Task Title *"), "Track My Tasks updates");
+    await user.type(screen.getByLabelText("Description"), "Keep this list current.");
+    await user.click(screen.getByRole("button", { name: "Create Task" }));
+
+    await user.click(screen.getByRole("link", { name: /Dashboard/ }));
+    expect(
+      screen.getByRole("article", {
+        name: /Track My Tasks updates, To Do/,
+      })
+    ).toBeTruthy();
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+    myTasksPage = screen.getByRole("region", { name: "My Tasks" });
+
+    expect(
+      within(myTasksPage).getByRole("group", { name: "Total Tasks" }).textContent
+    ).toContain("11");
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Track My Tasks updates, To Do",
+      })
+    ).toBeTruthy();
+    expect(within(myTasksPage).getByText("Keep this list current.")).toBeTruthy();
+
+    await user.click(
+      within(myTasksPage).getByRole("button", {
+        name: "Edit Track My Tasks updates",
+      })
+    );
+    const editDialog = screen.getByRole("dialog", { name: "Edit Task" });
+    const titleInput = screen.getByLabelText("Task Title *");
+    await user.clear(titleInput);
+    await user.type(titleInput, "Updated My Tasks item");
+    await user.selectOptions(within(editDialog).getByLabelText("Status"), "done");
+    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Updated My Tasks item, Done",
+      })
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole("link", { name: /Dashboard/ }));
+    expect(
+      screen.getByRole("article", {
+        name: /Updated My Tasks item, Done/,
+      })
+    ).toBeTruthy();
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+    myTasksPage = screen.getByRole("region", { name: "My Tasks" });
+
+    await user.click(
+      within(myTasksPage).getByRole("button", {
+        name: "Delete Updated My Tasks item",
+      })
+    );
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Updated My Tasks item, Done",
+      })
+    ).toBeTruthy();
+
+    confirmSpy.mockReturnValue(true);
+    await user.click(
+      within(myTasksPage).getByRole("button", {
+        name: "Delete Updated My Tasks item",
+      })
+    );
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+    expect(
+      within(myTasksPage).getByRole("group", { name: "Total Tasks" }).textContent
+    ).toContain("10");
+    expect(
+      within(myTasksPage).queryByRole("article", {
+        name: "Updated My Tasks item, Done",
+      })
+    ).toBeNull();
+  });
+
+  it("filters My Tasks by status and priority together and clears unmatched filters", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+
+    const myTasksPage = screen.getByRole("region", { name: "My Tasks" });
+    const statusFilter = within(myTasksPage).getByLabelText("Status");
+    const priorityFilter = within(myTasksPage).getByLabelText("Priority");
+
+    expect(
+      within(priorityFilter).getAllByRole("option").map((option) => option.value)
+    ).toEqual(["all", "Low", "Medium", "High"]);
+
+    await user.selectOptions(statusFilter, "done");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(3);
+    expect(within(myTasksPage).getByText("Showing 3 of 10 tasks")).toBeTruthy();
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Set up React project, Done",
+      })
+    ).toBeTruthy();
+
+    await user.selectOptions(statusFilter, "all");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(10);
+
+    await user.selectOptions(statusFilter, "in-progress");
+    await user.selectOptions(priorityFilter, "High");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(2);
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Build dashboard interface, In Progress",
+      })
+    ).toBeTruthy();
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Develop task components, In Progress",
+      })
+    ).toBeTruthy();
+    expect(within(myTasksPage).getByText("Showing 2 of 10 tasks")).toBeTruthy();
+
+    await user.selectOptions(priorityFilter, "Low");
+    expect(
+      within(myTasksPage).getByRole("heading", {
+        name: "No tasks match these filters",
+      })
+    ).toBeTruthy();
+    expect(within(myTasksPage).getByText("Showing 0 of 10 tasks")).toBeTruthy();
+
+    await user.click(
+      within(myTasksPage).getByRole("button", { name: "Clear Filters" })
+    );
+    expect(statusFilter.value).toBe("all");
+    expect(priorityFilter.value).toBe("all");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(10);
+  });
+
+  it("searches task titles, descriptions, and labels with filters and updates live", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+
+    const myTasksPage = screen.getByRole("region", { name: "My Tasks" });
+    const search = screen.getByRole("searchbox", { name: "Search tasks" });
+    const statusFilter = within(myTasksPage).getByLabelText("Status");
+    const priorityFilter = within(myTasksPage).getByLabelText("Priority");
+
+    await user.type(search, "dEsIgN lAnDiNg");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(1);
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Design landing page, To Do",
+      })
+    ).toBeTruthy();
+    expect(within(myTasksPage).getByText("Showing 1 of 10 tasks")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Clear task search" }));
+    expect(search.value).toBe("");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(10);
+
+    await user.type(search, "development");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(2);
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Configure Vite, Done",
+      })
+    ).toBeTruthy();
+
+    await user.clear(search);
+    await user.selectOptions(statusFilter, "todo");
+    await user.selectOptions(priorityFilter, "High");
+    await user.type(search, "design");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(1);
+
+    await user.clear(search);
+    await user.type(search, "no matching task");
+    await user.click(screen.getByRole("button", { name: "Add Task" }));
+    await user.type(screen.getByLabelText("Task Title *"), "Keyword container");
+    await user.type(
+      screen.getByLabelText("Description"),
+      "Distinctive searchable description"
+    );
+    await user.click(screen.getByRole("button", { name: "Create Task" }));
+    expect(
+      within(myTasksPage).getByRole("heading", {
+        name: "No tasks match your search",
+      })
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Clear Filters" }));
+    await user.type(search, "DISTINCTIVE SEARCHABLE DESCRIPTION");
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Keyword container, To Do",
+      })
+    ).toBeTruthy();
+    expect(within(myTasksPage).getByText("Showing 1 of 11 tasks")).toBeTruthy();
+  });
+
+  it("shows an empty state when all shared task columns are empty", async () => {
+    localStorage.setItem(
+      "taskflow-team-board.columns",
+      JSON.stringify([
+        { id: "todo", tasks: [] },
+        { id: "in-progress", tasks: [] },
+        { id: "done", tasks: [] },
+      ])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+
+    const myTasksPage = screen.getByRole("region", { name: "My Tasks" });
+    expect(within(myTasksPage).getByRole("heading", { name: "No tasks yet" })).toBeTruthy();
+    expect(
+      within(myTasksPage).getByRole("group", { name: "Total Tasks" }).textContent
+    ).toContain("0");
+    expect(within(myTasksPage).queryByRole("article")).toBeNull();
   });
 
   it("assigns missing due dates by status and displays tasks on their saved dates", async () => {
@@ -536,16 +780,32 @@ describe("dashboard task statistics", () => {
     expect(within(firstDateCell).getByText("Due task one")).toBeTruthy();
     expect(within(firstDateCell).getByText("Due task two")).toBeTruthy();
     expect(within(firstDateCell).queryByText("Due task three")).toBeNull();
-    expect(within(firstDateCell).getByText("+ 1 more")).toBeTruthy();
+    const showMoreButton = within(firstDateCell).getByRole("button", {
+      name: `Show 1 more task for ${dateLabel(15)}`,
+    });
+    expect(showMoreButton.getAttribute("aria-expanded")).toBe("false");
     expect(
       firstDateCell.querySelector(".calendar-task--todo .calendar-task-priority--medium")
     ).toBeTruthy();
+
+    await user.click(showMoreButton);
+    let selectedDayPanel = screen.getByRole("region", {
+      name: `Tasks for ${dateLabel(15)}`,
+    });
+    expect(showMoreButton.getAttribute("aria-expanded")).toBe("true");
+    expect(within(selectedDayPanel).getByText("Due task three")).toBeTruthy();
+    await user.click(
+      within(selectedDayPanel).getByRole("button", {
+        name: "Close selected date",
+      })
+    );
+
     await user.click(
       within(firstDateCell).getByRole("button", {
         name: new RegExp(`Select ${dateLabel(15)}`),
       })
     );
-    const selectedDayPanel = screen.getByRole("region", {
+    selectedDayPanel = screen.getByRole("region", {
       name: `Tasks for ${dateLabel(15)}`,
     });
     expect(within(selectedDayPanel).getByText("Due task one")).toBeTruthy();
@@ -871,7 +1131,7 @@ describe("dashboard task statistics", () => {
       })
     ).toBeTruthy();
     expect(
-      screen.getByText(/The header displays a Search tasks field/i)
+      screen.getByText(/Use the Search tasks field in the top navigation/i)
     ).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Edit a task" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Delete a task" })).toBeTruthy();
@@ -981,9 +1241,7 @@ describe("dashboard task statistics", () => {
     expect(
       within(profileSection).getByText("ada@example.com")
     ).toBeTruthy();
-    expect(
-      container.querySelector(".sidebar-profile-info strong").textContent
-    ).toBe("Ada Lovelace");
+    expect(container.querySelector(".sidebar-profile")).toBeNull();
     expect(
       container.querySelector(".header-profile .profile-avatar").textContent
     ).toContain("AL");
