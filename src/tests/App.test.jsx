@@ -55,6 +55,7 @@ async function checkProgressAndReturnToDashboard(user, expected) {
 describe("dashboard task statistics", () => {
   beforeEach(() => {
     localStorage.clear();
+    window.history.replaceState({}, "", window.location.pathname);
   });
 
   afterEach(() => {

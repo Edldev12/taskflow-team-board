@@ -4,6 +4,7 @@ import TaskCard from "./TaskCard";
 
 function TaskColumn({
   column,
+  searchQuery = "",
   onEdit,
   onDelete,
   draggedTaskId,
@@ -19,16 +20,23 @@ function TaskColumn({
   onColumnDragLeave,
   onTaskDrop,
 }) {
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+
+  const filteredTasks = column.tasks.filter((task) =>
+    [task.title, task.description, task.label]
+      .filter((value) => typeof value === "string")
+      .some((value) => value.toLowerCase().includes(normalizedSearchQuery))
+  );
   const isKeyboardDestination = keyboardMove?.columnId === column.id;
   const keyboardSourceTaskIndex = column.tasks.findIndex(
     (task) => String(task.id) === String(keyboardMove?.taskId)
   );
   const keyboardMarkerIndex = isKeyboardDestination
     ? keyboardMove.index +
-      (keyboardMove.sourceColumnId === column.id &&
+    (keyboardMove.sourceColumnId === column.id &&
       keyboardSourceTaskIndex < keyboardMove.index
-        ? 1
-        : 0)
+      ? 1
+      : 0)
     : -1;
 
   return (
@@ -44,15 +52,17 @@ function TaskColumn({
           <h2>{column.title}</h2>
         </div>
 
-        <span className="task-count">{column.tasks.length}</span>
+        <span className="task-count">{filteredTasks.length}</span>
       </div>
 
       <div className="column-tasks">
-        {column.tasks.map((task, index) => (
+        {filteredTasks.map((task, index) => (
           <Fragment key={task.id}>
-            {isKeyboardDestination && keyboardMarkerIndex === index && (
-              <div className="keyboard-drop-indicator" aria-hidden="true" />
-            )}
+            {isKeyboardDestination &&
+              !normalizedSearchQuery &&
+              keyboardMarkerIndex === index && (
+                <div className="keyboard-drop-indicator" aria-hidden="true" />
+              )}
             <TaskCard
               task={task}
               columnTitle={column.title}
@@ -65,7 +75,7 @@ function TaskColumn({
               }
               dropPosition={
                 dropIndicator?.columnId === column.id &&
-                dropIndicator.taskId === task.id
+                  dropIndicator.taskId === task.id
                   ? dropIndicator.position
                   : null
               }
@@ -81,7 +91,8 @@ function TaskColumn({
           </Fragment>
         ))}
         {isKeyboardDestination &&
-          keyboardMarkerIndex === column.tasks.length && (
+          !normalizedSearchQuery &&
+          keyboardMarkerIndex === filteredTasks.length && (
             <div className="keyboard-drop-indicator" aria-hidden="true" />
           )}
       </div>
