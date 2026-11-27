@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Inbox, ListTodo } from "lucide-react";
 import TaskCard from "./TaskCard";
 import "./MyTasksPage.css";
@@ -10,11 +10,12 @@ const taskStatusLabels = {
 };
 
 const taskPriorities = ["Low", "Medium", "High"];
-
 function MyTasksPage({
   columns,
   searchQuery,
-  onSearchQueryChange,
+  taskFilters,
+  onFilterChange,
+  onClearFilters,
   onCreateTask,
   onEditTask,
   onDeleteTask,
@@ -31,14 +32,16 @@ function MyTasksPage({
       ),
     [columns]
   );
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [priorityFilter, setPriorityFilter] = useState("all");
+  const statusFilter = taskFilters.status;
+  const priorityFilter = taskFilters.priority;
+  const labelFilter = taskFilters.label;
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredTasks = useMemo(
     () => {
       if (
         statusFilter === "all" &&
         priorityFilter === "all" &&
+        labelFilter === "all" &&
         !normalizedSearchQuery
       ) {
         return tasks;
@@ -49,6 +52,9 @@ function MyTasksPage({
         if (priorityFilter !== "all" && task.priority !== priorityFilter) {
           return false;
         }
+
+        if (labelFilter !== "all" && task.label !== labelFilter) return false;
+
         if (!normalizedSearchQuery) return true;
 
         const searchableText = [
@@ -62,11 +68,12 @@ function MyTasksPage({
         );
       });
     },
-    [normalizedSearchQuery, priorityFilter, statusFilter, tasks]
+    [labelFilter, normalizedSearchQuery, priorityFilter, statusFilter, tasks]
   );
   const hasActiveFilters =
     statusFilter !== "all" ||
     priorityFilter !== "all" ||
+    labelFilter !== "all" ||
     normalizedSearchQuery !== "";
 
   return (
@@ -120,7 +127,26 @@ function MyTasksPage({
               className="my-task-filter-fields"
               role="group"
               aria-label="Task filters"
+            ><label
+              className="my-task-filter-field"
+              htmlFor="my-tasks-label-filter"
             >
+                <span>Label</span>
+                <select
+                  id="my-tasks-label-filter"
+                  value={labelFilter}
+                  onChange={(event) => onFilterChange("label", event.target.value)}
+                >
+                  <option value="all">All Labels</option>
+                  {[...new Set(tasks.map(({ task }) => task.label).filter(Boolean))]
+                    .sort()
+                    .map((label) => (
+                      <option key={label} value={label}>
+                        {label}
+                      </option>
+                    ))}
+                </select>
+              </label>
               <label
                 className="my-task-filter-field"
                 htmlFor="my-tasks-status-filter"
@@ -129,7 +155,7 @@ function MyTasksPage({
                 <select
                   id="my-tasks-status-filter"
                   value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value)}
+                  onChange={(event) => onFilterChange("status", event.target.value)}
                 >
                   <option value="all">All Statuses</option>
                   {columns.map((column) => (
@@ -148,7 +174,7 @@ function MyTasksPage({
                 <select
                   id="my-tasks-priority-filter"
                   value={priorityFilter}
-                  onChange={(event) => setPriorityFilter(event.target.value)}
+                  onChange={(event) => onFilterChange("priority", event.target.value)}
                 >
                   <option value="all">All Priorities</option>
                   {taskPriorities.map((priority) => (
@@ -172,11 +198,7 @@ function MyTasksPage({
               <button
                 className="my-task-clear-filters"
                 type="button"
-                onClick={() => {
-                  setStatusFilter("all");
-                  setPriorityFilter("all");
-                  onSearchQueryChange("");
-                }}
+                onClick={onClearFilters}
                 disabled={!hasActiveFilters}
               >
                 Clear Filters
@@ -193,11 +215,12 @@ function MyTasksPage({
               </h2>
               <p>
                 {normalizedSearchQuery
-                  ? `No tasks match “${searchQuery.trim()}”${
-                      statusFilter !== "all" || priorityFilter !== "all"
-                        ? " with the selected filters."
-                        : ". Try a different search."
-                    }`
+                  ? `No tasks match “${searchQuery.trim()}”${statusFilter !== "all" ||
+                    priorityFilter !== "all" ||
+                    labelFilter !== "all"
+                    ? " with the selected filters."
+                    : ". Try a different search."
+                  }`
                   : "Change your filters or clear them to see all tasks."}
               </p>
             </div>

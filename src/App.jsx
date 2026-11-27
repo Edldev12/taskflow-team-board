@@ -272,7 +272,39 @@ function getTaskMovementAnnouncement(previousColumns, nextColumns, taskId) {
 
   return `${task.title} moved to position ${newPosition + 1} in ${destinationColumn.title}.`;
 }
+const TASK_FILTER_DEFAULTS = {
+  search: "",
+  status: "all",
+  priority: "all",
+  label: "all",
+};
 
+function readTaskFiltersFromUrl(columns) {
+  const params = new URLSearchParams(window.location.search);
+
+  const status = params.get("status") || "all";
+  const priority = params.get("priority") || "all";
+  const label = params.get("label") || "all";
+
+  const validStatuses = columns.map((column) => column.id);
+  const validLabels = new Set(
+    columns.flatMap((column) =>
+      column.tasks.map((task) => task.label).filter(Boolean)
+    )
+  );
+
+  return {
+    ...TASK_FILTER_DEFAULTS,
+    search: params.get("search") || "",
+    status:
+      status === "all" || validStatuses.includes(status) ? status : "all",
+    priority:
+      priority === "all" || ["Low", "Medium", "High"].includes(priority)
+        ? priority
+        : "all",
+    label: label === "all" || validLabels.has(label) ? label : "all",
+  };
+}
 function App() {
   const [themePreference, setThemePreference] = useState(loadThemePreference);
   const [systemTheme, setSystemTheme] = useState(getSystemTheme);
@@ -283,7 +315,61 @@ function App() {
   );
   const [activePage, setActivePage] = useState("dashboard");
   const [columns, setColumns] = useState(loadTaskColumns);
-  const [taskSearchQuery, setTaskSearchQuery] = useState("");
+  const [taskFilters, setTaskFilters] = useState(() =>
+    readTaskFiltersFromUrl(columns)
+  );
+  const taskSearchQuery = taskFilters.search;
+  function updateTaskFilter(name, value) {
+    const nextFilters = { ...taskFilters, [name]: value };
+    const params = new URLSearchParams(window.location.search);
+
+    Object.entries(TASK_FILTER_DEFAULTS).forEach(([key, defaultValue]) => {
+      if (nextFilters[key] === defaultValue) {
+        params.delete(key);
+      } else {
+        params.set(key, nextFilters[key]);
+      }
+    });
+
+    const query = params.toString();
+    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+
+    if (name === "search") {
+      window.history.replaceState(window.history.state, "", nextUrl);
+    } else {
+      window.history.pushState(window.history.state, "", nextUrl);
+    }
+
+    setTaskFilters(nextFilters);
+  }
+  useEffect(() => {
+    function handlePopState() {
+      setTaskFilters(readTaskFiltersFromUrl(columns));
+    }
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [columns]);
+  function setTaskSearchQuery(value) {
+    updateTaskFilter("search", value);
+  }
+  function clearTaskFilters() {
+    const nextFilters = { ...TASK_FILTER_DEFAULTS };
+    const params = new URLSearchParams(window.location.search);
+
+    Object.keys(TASK_FILTER_DEFAULTS).forEach((key) => {
+      params.delete(key);
+    });
+
+    const query = params.toString();
+    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+
+    window.history.pushState(window.history.state, "", nextUrl);
+    setTaskFilters(nextFilters);
+  }
   const [defaultTaskDueDate, setDefaultTaskDueDate] = useState("");
   const [notifications, setNotifications] = useState(loadNotifications);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -535,14 +621,14 @@ function App() {
       }));
       const nextColumns =
         sourceColumn &&
-        destinationColumn &&
-        sourceColumn.id !== destinationColumn.id
+          destinationColumn &&
+          sourceColumn.id !== destinationColumn.id
           ? moveTaskToPosition(
-              updatedColumns,
-              selectedTask.id,
-              destinationColumn.id,
-              destinationColumn.tasks.length
-            )
+            updatedColumns,
+            selectedTask.id,
+            destinationColumn.id,
+            destinationColumn.tasks.length
+          )
           : updatedColumns;
 
       recordTaskStatusChange(columns, nextColumns, selectedTask.id);
@@ -942,7 +1028,9 @@ function App() {
           <MyTasksPage
             columns={columns}
             searchQuery={taskSearchQuery}
-            onSearchQueryChange={setTaskSearchQuery}
+            taskFilters={taskFilters}
+            onFilterChange={updateTaskFilter}
+            onClearFilters={clearTaskFilters}
             onCreateTask={openCreateModal}
             onEditTask={openEditModal}
             onDeleteTask={deleteTask}
@@ -950,86 +1038,87 @@ function App() {
           />
         ) : (
           <section className="dashboard-content" id="dashboard">
-          <div className="dashboard-heading">
-            <div>
-              <h1>My Tasks</h1>
-              <p>Organize your work and stay on track.</p>
-            </div>
+            <div className="dashboard-heading">
+              <div>
+                <h1>My Tasks</h1>
+                <p>Organize your work and stay on track.</p>
+              </div>
 
-            {/*
+              {/*
             <button className="add-task-button" disabled>
               <span>+</span> Add Task
             </button>
             */}
-            <button
-              ref={triggerRef}
-              className="add-task-button"
-              onClick={openCreateModal}
-              type="button"
-            >
-              <span>+</span> Add Task
-            </button>
-          </div>
+              <button
+                ref={triggerRef}
+                className="add-task-button"
+                onClick={openCreateModal}
+                type="button"
+              >
+                <span>+</span> Add Task
+              </button>
+            </div>
 
-          {/*
+            {/*
           <div className="task-board">
             {taskColumns.map((column) => (
               <TaskColumn key={column.id} column={column} />
             ))}
           </div>
           */}
-          <div className="task-board">
-            {columns.map((column) => (
-              <TaskColumn
-                key={column.id}
-                column={column}
-                onEdit={openEditModal}
-                onDelete={deleteTask}
-                draggedTaskId={draggedTaskId}
-                dropIndicator={dropIndicator}
-                keyboardMove={keyboardMove}
-                isDropTarget={
-                  dropTargetColumnId === column.id ||
-                  keyboardMove?.columnId === column.id
-                }
-                onTaskDragStart={handleTaskDragStart}
-                onTaskDragEnd={handleTaskDragEnd}
-                onTaskDragOver={(taskId, event) =>
-                  handleTaskDragOver(column.id, taskId, event)
-                }
-                onTaskKeyDown={handleTaskKeyDown}
-                onTaskCardRef={(taskId, element) => {
-                  const key = String(taskId);
-                  if (element) {
-                    taskCardRefs.current.set(key, element);
-                  } else {
-                    taskCardRefs.current.delete(key);
+            <div className="task-board">
+              {columns.map((column) => (
+                <TaskColumn
+                  key={column.id}
+                  column={column}
+                  searchQuery={taskSearchQuery}
+                  onEdit={openEditModal}
+                  onDelete={deleteTask}
+                  draggedTaskId={draggedTaskId}
+                  dropIndicator={dropIndicator}
+                  keyboardMove={keyboardMove}
+                  isDropTarget={
+                    dropTargetColumnId === column.id ||
+                    keyboardMove?.columnId === column.id
                   }
-                }}
-                onColumnDragOver={(event) => handleColumnDragOver(column.id, event)}
-                onColumnDragLeave={(event) => handleColumnDragLeave(column.id, event)}
-                onTaskDrop={(event, targetTaskId) =>
-                  handleTaskDrop(column.id, event, targetTaskId)
-                }
-              />
-            ))}
-          </div>
-          <p id="task-keyboard-help" className="visually-hidden">
-            Press Enter or Space on a task to pick it up. Use the arrow keys to
-            choose a column and position, then press Enter or Space to drop.
-            Press Escape to cancel. Tab cancels movement and continues navigation.
-          </p>
-          <div
-            className={`task-movement-notification${taskAnnouncement ? " is-visible" : ""}`}
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            <span className="task-movement-notification-icon" aria-hidden="true">
-              ✓
-            </span>
-            {taskAnnouncement}
-          </div>
+                  onTaskDragStart={handleTaskDragStart}
+                  onTaskDragEnd={handleTaskDragEnd}
+                  onTaskDragOver={(taskId, event) =>
+                    handleTaskDragOver(column.id, taskId, event)
+                  }
+                  onTaskKeyDown={handleTaskKeyDown}
+                  onTaskCardRef={(taskId, element) => {
+                    const key = String(taskId);
+                    if (element) {
+                      taskCardRefs.current.set(key, element);
+                    } else {
+                      taskCardRefs.current.delete(key);
+                    }
+                  }}
+                  onColumnDragOver={(event) => handleColumnDragOver(column.id, event)}
+                  onColumnDragLeave={(event) => handleColumnDragLeave(column.id, event)}
+                  onTaskDrop={(event, targetTaskId) =>
+                    handleTaskDrop(column.id, event, targetTaskId)
+                  }
+                />
+              ))}
+            </div>
+            <p id="task-keyboard-help" className="visually-hidden">
+              Press Enter or Space on a task to pick it up. Use the arrow keys to
+              choose a column and position, then press Enter or Space to drop.
+              Press Escape to cancel. Tab cancels movement and continues navigation.
+            </p>
+            <div
+              className={`task-movement-notification${taskAnnouncement ? " is-visible" : ""}`}
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <span className="task-movement-notification-icon" aria-hidden="true">
+                ✓
+              </span>
+              {taskAnnouncement}
+            </div>
           </section>
         )}
         {isModalOpen && (
