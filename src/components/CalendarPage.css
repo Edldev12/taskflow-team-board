@@ -58,7 +58,7 @@
   border: 1px solid var(--border);
   border-radius: 9px;
   background: var(--surface);
-  color: #2876bd;
+  color: #1d5b94;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -67,7 +67,7 @@
 .calendar-month-button:hover {
   border-color: #9cc8f1;
   background: #eaf4ff;
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .calendar-today-button:hover {
@@ -154,7 +154,7 @@
 .calendar-day-select:hover,
 .calendar-day-select[aria-pressed="true"] {
   background: #eaf4ff;
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .calendar-day-select:focus-visible {
@@ -163,7 +163,7 @@
 }
 
 .calendar-day.is-outside-month {
-  color: #aab5c2;
+  color: #5f6b7a;
   background: var(--background);
 }
 
@@ -250,7 +250,7 @@
 .calendar-task--in-progress {
   border-color: #f0dfc8;
   background: #fff6ea;
-  color: #a76b23;
+  color: #825914;
 }
 
 .calendar-task--done {
@@ -289,7 +289,7 @@
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: #2876bd;
+  color: #1d5b94;
   font: inherit;
   font-size: 10px;
   font-weight: 600;

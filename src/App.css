@@ -39,7 +39,7 @@
   flex-shrink: 0;
   border-radius: 12px;
   background: #dceeff;
-  color: #2876bd;
+  color: #1d5b94;
   font-size: 30px;
   font-weight: 800;
 }
@@ -93,7 +93,7 @@
 .nav-link:hover,
 .nav-link.active {
   background: #eaf4ff;
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .nav-link:focus-visible {
@@ -266,7 +266,7 @@
   place-items: center;
   border-radius: 10px;
   background: #eaf4ff;
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .task-stats-card p {
@@ -284,12 +284,12 @@
 
 .task-stats-card--completed .task-stats-icon {
   background: #e9f7ef;
-  color: #39875c;
+  color: #2f704b;
 }
 
 .task-stats-card--pending .task-stats-icon {
   background: #fff5e6;
-  color: #b98132;
+  color: #825914;
 }
 
 .add-task-button {
@@ -485,22 +485,22 @@
 
 .task-label {
   background: #eaf3fc;
-  color: #3978b5;
+  color: #28689f;
 }
 
 .priority.high {
   background: #fff0ed;
-  color: #d66d5c;
+  color: #a64435;
 }
 
 .priority.medium {
   background: #fff5e6;
-  color: #b98132;
+  color: #825914;
 }
 
 .priority.low {
   background: #e9f7ef;
-  color: #39875c;
+  color: #2f704b;
 }
 
 /* Dark theme */
@@ -638,7 +638,7 @@
 }
 
 .task-delete-button {
-  color: #dc5145;
+  color: #b3362e;
 }
 
 .app-layout[data-theme="dark"] .task-delete-button {
@@ -704,7 +704,7 @@
   place-items: center;
   border-radius: 50%;
   background: #e9f7ef;
-  color: #39875c;
+  color: #2f704b;
   font-size: 14px;
   font-weight: 700;
 }

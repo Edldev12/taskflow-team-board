@@ -59,7 +59,7 @@
   place-items: center;
   border-radius: 10px;
   background: #eaf4ff;
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .application-preference-description {
@@ -246,7 +246,7 @@
   place-items: center;
   border-radius: 11px;
   background: #eaf4ff;
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .settings-section-icon {
@@ -334,7 +334,7 @@
   position: absolute;
   right: 12px;
   bottom: 11px;
-  color: #2876bd;
+  color: #1d5b94;
   font-size: 11px;
   font-weight: 700;
 }
@@ -371,7 +371,7 @@
   place-items: center;
   border-radius: 50%;
   background: #dceeff;
-  color: #2876bd;
+  color: #1d5b94;
   font-size: 22px;
   font-weight: 750;
   letter-spacing: 0.4px;
@@ -400,7 +400,7 @@
 
 .settings-profile-email svg {
   flex: none;
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .settings-edit-profile-button,
@@ -536,7 +536,7 @@
 
 .settings-profile-saved {
   margin: 14px 0 0;
-  color: #39875c;
+  color: #2f704b;
   font-size: 13px;
   font-weight: 600;
 }

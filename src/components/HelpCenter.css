@@ -13,7 +13,7 @@
 
 .help-eyebrow {
   margin: 0 0 7px;
-  color: #2876bd;
+  color: #1d5b94;
   font-size: 10px;
   font-weight: 750;
   letter-spacing: 1.1px;
@@ -51,7 +51,7 @@
 
 .help-back-button:hover {
   border-color: #72b7f5;
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .help-back-button:focus-visible {
@@ -89,7 +89,7 @@
   place-items: center;
   border-radius: 10px;
   background: #eaf4ff;
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .help-guide-icon {
@@ -139,7 +139,7 @@
   place-items: center;
   border-radius: 50%;
   background: #dceeff;
-  color: #2876bd;
+  color: #1d5b94;
   font-size: 12px;
   font-weight: 750;
 }
@@ -216,7 +216,7 @@
   place-items: center;
   border-radius: 10px;
   background: #eaf4ff;
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .help-action-heading h3 {
@@ -283,7 +283,7 @@
 }
 
 .help-action-tip svg {
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .help-action-warning {
@@ -292,7 +292,7 @@
 }
 
 .help-action-warning svg {
-  color: #c65e4d;
+  color: #a64435;
 }
 
 .help-action-warning p {
@@ -307,7 +307,7 @@
 }
 
 .help-delete-tip svg {
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .help-field-grid {
