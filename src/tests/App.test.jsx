@@ -6,11 +6,47 @@ import {
   render,
   screen,
   within,
+  waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import {
+  createTask as createTaskApi,
+  deleteTask as deleteTaskApi,
+  updateTask as updateTaskApi,
+} from "../api/taskApi";
 import App from "../App";
 
+vi.mock("../api/taskApi", () => ({
+  createTask: vi.fn(),
+  deleteTask: vi.fn(),
+  updateTask: vi.fn(),
+}));
+
 let originalWindowMatchMedia;
+let createdTaskId = 0;
+
+function getTaskColumn(title) {
+  return screen.getByRole("heading", { name: title }).closest(".task-column");
+}
+
+function createDataTransfer() {
+  const transferData = {};
+  return {
+    setData: vi.fn((type, value) => {
+      transferData[type] = value;
+    }),
+    getData: vi.fn((type) => transferData[type] || ""),
+    effectAllowed: "",
+    dropEffect: "",
+  };
+}
+
+function dragTaskTo(task, destination, options = {}) {
+  const dataTransfer = createDataTransfer();
+  fireEvent.dragStart(task, { dataTransfer });
+  fireEvent.drop(destination, { dataTransfer, ...options });
+  return dataTransfer;
+}
 
 async function checkProgressAndReturnToDashboard(user, expected) {
   await user.click(screen.getByRole("link", { name: /Your Progress/ }));
@@ -56,6 +92,19 @@ describe("dashboard task statistics", () => {
   beforeEach(() => {
     localStorage.clear();
     window.history.replaceState({}, "", window.location.pathname);
+    createdTaskId = 0;
+    createTaskApi.mockReset().mockImplementation(async (task) => ({
+      ...task,
+      id: `created-${++createdTaskId}`,
+    }));
+    updateTaskApi.mockReset().mockImplementation(async (taskId, updates) => ({
+      ...updates,
+      id: taskId,
+    }));
+    deleteTaskApi.mockReset().mockImplementation(async (taskId) => ({
+      success: true,
+      id: taskId,
+    }));
   });
 
   afterEach(() => {
@@ -69,6 +118,155 @@ describe("dashboard task statistics", () => {
       window.matchMedia = originalWindowMatchMedia;
     }
     originalWindowMatchMedia = undefined;
+  });
+
+  it("shows a clear validation message and skips the API for a blank title", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /add task/i }));
+    await user.type(screen.getByLabelText("Task Title *"), "   ");
+    await user.click(screen.getByRole("button", { name: "Create Task" }));
+
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Task title is required."
+    );
+    expect(createTaskApi).not.toHaveBeenCalled();
+  });
+
+  it("creates a task in the selected column with the submitted details", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /add task/i }));
+    await user.type(screen.getByLabelText("Task Title *"), "Ship release notes");
+    await user.type(screen.getByLabelText("Description"), "Summarize this release.");
+    await user.type(screen.getByLabelText("Label"), "Release");
+    await user.selectOptions(screen.getByLabelText("Status"), "done");
+    await user.click(screen.getByRole("button", { name: "Create Task" }));
+
+    const doneColumn = screen.getByRole("heading", { name: "Done" }).closest(
+      ".task-column"
+    );
+    expect(
+      await within(doneColumn).findByRole("article", {
+        name: /Ship release notes, Done/,
+      })
+    ).toBeTruthy();
+    expect(within(doneColumn).getByText("4")).toBeTruthy();
+    expect(createTaskApi).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Ship release notes",
+        description: "Summarize this release.",
+        label: "Release",
+        status: "done",
+      })
+    );
+  });
+
+  it("keeps a failed create out of the board and retries without duplicate submits", async () => {
+    let resolveCreate;
+    createTaskApi
+      .mockRejectedValueOnce(new Error("Create failed."))
+      .mockImplementationOnce((task) => new Promise((resolve) => {
+        resolveCreate = () => resolve({
+          ...task,
+          id: "created-after-retry",
+        });
+      }));
+
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: /add task/i }));
+    await user.type(screen.getByLabelText("Task Title *"), "Retry this task");
+    await user.click(screen.getByRole("button", { name: "Create Task" }));
+
+    const error = await screen.findByRole("alert");
+    expect(error.textContent).toContain("Create failed.");
+    expect(
+      screen.queryByRole("article", { name: /Retry this task/ })
+    ).toBeNull();
+
+    await user.click(within(error).getByRole("button", { name: "Retry" }));
+    const savingButton = await screen.findByRole("button", {
+      name: "Saving...",
+    });
+    expect(savingButton.disabled).toBe(true);
+    expect(createTaskApi).toHaveBeenCalledTimes(2);
+    await user.click(savingButton);
+    expect(createTaskApi).toHaveBeenCalledTimes(2);
+    await act(async () => resolveCreate());
+
+    expect(
+      await screen.findByRole("article", {
+        name: "Retry this task, To Do. Press Enter or Space to move.",
+      })
+    ).toBeTruthy();
+    expect(createTaskApi).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves an edited task unchanged after failure and retries the same task", async () => {
+    updateTaskApi
+      .mockRejectedValueOnce(new Error("Update failed."))
+      .mockImplementationOnce(async (taskId, updates) => ({
+        ...updates,
+        id: taskId,
+      }));
+
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Edit Design landing page" }));
+    const dialog = screen.getByRole("dialog", { name: "Edit Task" });
+    const title = within(dialog).getByLabelText("Task Title *");
+    expect(title.value).toBe("Design landing page");
+    await user.clear(title);
+    await user.type(title, "Updated after retry");
+    await user.click(within(dialog).getByRole("button", { name: "Save Changes" }));
+
+    const error = await screen.findByRole("alert");
+    expect(error.textContent).toContain("Update failed.");
+    expect(
+      screen.getByRole("article", { name: /Design landing page, To Do/ })
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("article", { name: /Updated after retry/ })
+    ).toBeNull();
+
+    await user.click(within(error).getByRole("button", { name: "Retry" }));
+    expect(
+      await screen.findByRole("article", { name: /Updated after retry, To Do/ })
+    ).toBeTruthy();
+    expect(updateTaskApi).toHaveBeenCalledTimes(2);
+    expect(updateTaskApi.mock.calls[0][0]).toBe(1);
+    expect(updateTaskApi.mock.calls[1][0]).toBe(1);
+  });
+
+  it("preserves a task after delete failure and removes it on retry", async () => {
+    deleteTaskApi
+      .mockRejectedValueOnce(new Error("Delete failed."))
+      .mockImplementationOnce(async (taskId) => ({ success: true, id: taskId }));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Delete Design landing page" }));
+
+    const error = await screen.findByRole("alert");
+    expect(error.textContent).toContain("Delete failed.");
+    expect(
+      screen.getByRole("article", { name: /Design landing page, To Do/ })
+    ).toBeTruthy();
+
+    await user.click(within(error).getByRole("button", { name: "Retry" }));
+    await screen.findByText("Task deleted.");
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("article", { name: /Design landing page, To Do/ })
+      ).toBeNull();
+    });
+    expect(deleteTaskApi).toHaveBeenCalledTimes(2);
+    expect(deleteTaskApi).toHaveBeenNthCalledWith(1, 1);
+    expect(deleteTaskApi).toHaveBeenNthCalledWith(2, 1);
   });
 
   it("counts tasks across columns and updates after creating and deleting a task", async () => {
@@ -123,6 +321,9 @@ describe("dashboard task statistics", () => {
     });
     await user.click(task);
     await user.keyboard("{Enter}{ArrowRight}{Enter}");
+    expect(
+      document.querySelector(".task-movement-notification").textContent
+    ).toContain("Design landing page moved from To Do to In Progress.");
     await checkProgressAndReturnToDashboard(user, {
       total: 10,
       completed: 3,
@@ -147,6 +348,7 @@ describe("dashboard task statistics", () => {
     });
     await user.click(task);
     await user.keyboard("{Enter}{ArrowLeft}{Enter}");
+    expect(updateTaskApi).toHaveBeenCalledWith(1, { status: "in-progress" });
     await checkProgressAndReturnToDashboard(user, {
       total: 10,
       completed: 3,
@@ -165,6 +367,234 @@ describe("dashboard task statistics", () => {
       pending: 7,
       percentage: 30,
     });
+  });
+
+  it("reorders tasks within a column without calling the API", () => {
+    render(<App />);
+    const todoColumn = getTaskColumn("To Do");
+    const [firstTask] = within(todoColumn).getAllByRole("article");
+    const targetTask = within(todoColumn).getByRole("article", {
+      name: /Review project requirements/,
+    });
+    vi.spyOn(targetTask, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      bottom: 100,
+      left: 0,
+      right: 100,
+      width: 100,
+      height: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    dragTaskTo(firstTask, targetTask, { clientY: 90 });
+
+    const reorderedTasks = within(todoColumn).getAllByRole("article");
+    expect(reorderedTasks[0]).toBe(targetTask);
+    expect(reorderedTasks[1].getAttribute("aria-label")).toMatch(
+      /Design landing page, To Do/
+    );
+    expect(updateTaskApi).not.toHaveBeenCalled();
+  });
+
+  it("supports keyboard reordering and keeps focus on the moved task", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const firstTask = within(getTaskColumn("To Do")).getByRole("article", {
+      name: /Design landing page/,
+    });
+
+    await user.click(firstTask);
+    await user.keyboard("{Enter}{ArrowDown}{Enter}");
+
+    const todoTasks = within(getTaskColumn("To Do")).getAllByRole("article");
+    expect(todoTasks[0].getAttribute("aria-label")).toMatch(
+      /Review project requirements, To Do/
+    );
+    expect(todoTasks[1].getAttribute("aria-label")).toMatch(
+      /Design landing page, To Do/
+    );
+    expect(document.activeElement).toBe(todoTasks[1]);
+    expect(
+      document.querySelector(".task-movement-notification").textContent
+    ).toContain("Design landing page moved to position 2 in To Do.");
+    expect(updateTaskApi).not.toHaveBeenCalled();
+  });
+
+  it("ignores drops for unknown tasks without changing the board", () => {
+    render(<App />);
+    const dataTransfer = createDataTransfer();
+    dataTransfer.setData("text/plain", "missing-task");
+
+    fireEvent.drop(getTaskColumn("In Progress"), { dataTransfer });
+
+    expect(
+      within(getTaskColumn("To Do")).getAllByRole("article")
+    ).toHaveLength(4);
+    expect(
+      within(getTaskColumn("In Progress")).getAllByRole("article")
+    ).toHaveLength(3);
+    expect(updateTaskApi).not.toHaveBeenCalled();
+  });
+
+  it("moves optimistically and rolls back only the failed task", async () => {
+    let rejectFirstMove;
+    updateTaskApi
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve, reject) => {
+            rejectFirstMove = reject;
+          })
+      )
+      .mockResolvedValueOnce({ id: 2, status: "done" });
+
+    render(<App />);
+    const todoColumn = getTaskColumn("To Do");
+    const firstTask = within(todoColumn).getByRole("article", {
+      name: /Design landing page/,
+    });
+    const dataTransfer = dragTaskTo(
+      firstTask,
+      getTaskColumn("In Progress")
+    );
+
+    expect(dataTransfer.getData("text/plain")).toBe("1");
+    expect(
+      within(getTaskColumn("In Progress")).getByRole("article", {
+        name: /Design landing page, In Progress/,
+      })
+    ).toBeTruthy();
+    expect(getTaskColumn("In Progress").querySelector(".task-count").textContent)
+      .toBe("4");
+    expect(getTaskColumn("To Do").querySelector(".task-count").textContent).toBe(
+      "3"
+    );
+
+    const secondTask = within(getTaskColumn("To Do")).getByRole("article", {
+      name: /Review project requirements/,
+    });
+    dragTaskTo(secondTask, getTaskColumn("Done"));
+
+    await waitFor(() => expect(updateTaskApi).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      rejectFirstMove(new Error("Move failed."));
+      await Promise.resolve();
+    });
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "Unable to move Design landing page. Move failed."
+    );
+    expect(
+      within(getTaskColumn("To Do")).getAllByRole("article")[0]
+        .getAttribute("aria-label")
+    ).toMatch(/Design landing page, To Do/);
+    expect(
+      within(getTaskColumn("Done")).getByRole("article", {
+        name: /Review project requirements, Done/,
+      })
+    ).toBeTruthy();
+  });
+
+  it("sequences rapid moves of one task and rolls back to its last saved column", async () => {
+    const requests = [];
+    updateTaskApi.mockImplementation(
+      (taskId, updates) =>
+        new Promise((resolve, reject) => {
+          requests.push({ taskId, updates, resolve, reject });
+        })
+    );
+
+    render(<App />);
+    const firstTask = within(getTaskColumn("To Do")).getByRole("article", {
+      name: /Design landing page/,
+    });
+    dragTaskTo(firstTask, getTaskColumn("In Progress"));
+    await waitFor(() => expect(updateTaskApi).toHaveBeenCalledTimes(1));
+
+    const movedTask = within(getTaskColumn("In Progress")).getByRole("article", {
+      name: /Design landing page/,
+    });
+    dragTaskTo(movedTask, getTaskColumn("Done"));
+
+    expect(
+      within(getTaskColumn("Done")).getByRole("article", {
+        name: /Design landing page, Done/,
+      })
+    ).toBeTruthy();
+    expect(updateTaskApi).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      requests[0].resolve({ id: requests[0].taskId, ...requests[0].updates });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(updateTaskApi).toHaveBeenCalledTimes(2));
+    expect(requests[1].updates).toEqual({ status: "done" });
+
+    await act(async () => {
+      requests[1].reject(new Error("Latest move failed."));
+      await Promise.resolve();
+    });
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "Unable to move Design landing page. Latest move failed."
+    );
+    expect(
+      within(getTaskColumn("In Progress")).getByRole("article", {
+        name: /Design landing page, In Progress/,
+      })
+    ).toBeTruthy();
+    expect(
+      within(getTaskColumn("To Do").querySelector(".column-tasks")).queryByRole(
+        "article",
+        { name: /Design landing page/ }
+      )
+    ).toBeNull();
+  });
+
+  it("saves moves for different tasks independently", async () => {
+    const requests = [];
+    updateTaskApi.mockImplementation(
+      (taskId, updates) =>
+        new Promise((resolve) => {
+          requests.push({ taskId, updates, resolve });
+        })
+    );
+
+    render(<App />);
+    const todoColumn = getTaskColumn("To Do");
+    dragTaskTo(
+      within(todoColumn).getByRole("article", {
+        name: /Design landing page/,
+      }),
+      getTaskColumn("In Progress")
+    );
+    dragTaskTo(
+      within(getTaskColumn("To Do")).getByRole("article", {
+        name: /Review project requirements/,
+      }),
+      getTaskColumn("Done")
+    );
+
+    await waitFor(() => expect(updateTaskApi).toHaveBeenCalledTimes(2));
+    expect(requests.map((request) => request.taskId).sort()).toEqual(["1", "2"]);
+
+    await act(async () => {
+      requests[1].resolve({ id: requests[1].taskId, ...requests[1].updates });
+      requests[0].resolve({ id: requests[0].taskId, ...requests[0].updates });
+      await Promise.resolve();
+    });
+
+    expect(
+      within(getTaskColumn("In Progress")).getByRole("article", {
+        name: /Design landing page, In Progress/,
+      })
+    ).toBeTruthy();
+    expect(
+      within(getTaskColumn("Done")).getByRole("article", {
+        name: /Review project requirements, Done/,
+      })
+    ).toBeTruthy();
   });
 
   it("rounds the completion percentage to a whole number", async () => {
@@ -520,6 +950,13 @@ describe("dashboard task statistics", () => {
     await user.type(screen.getByLabelText("Description"), "Keep this list current.");
     await user.click(screen.getByRole("button", { name: "Create Task" }));
 
+    expect(createTaskApi).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Track My Tasks updates",
+        description: "Keep this list current.",
+        status: "todo",
+      })
+    );
     await user.click(screen.getByRole("link", { name: /Dashboard/ }));
     expect(
       screen.getByRole("article", {
@@ -551,6 +988,13 @@ describe("dashboard task statistics", () => {
     await user.selectOptions(within(editDialog).getByLabelText("Status"), "done");
     await user.click(screen.getByRole("button", { name: "Save Changes" }));
 
+    expect(updateTaskApi).toHaveBeenCalledWith(
+      "created-1",
+      expect.objectContaining({
+        title: "Updated My Tasks item",
+        status: "done",
+      })
+    );
     expect(
       within(myTasksPage).getByRole("article", {
         name: "Updated My Tasks item, Done",
@@ -572,6 +1016,7 @@ describe("dashboard task statistics", () => {
       })
     );
     expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(deleteTaskApi).not.toHaveBeenCalled();
     expect(
       within(myTasksPage).getByRole("article", {
         name: "Updated My Tasks item, Done",
@@ -585,6 +1030,7 @@ describe("dashboard task statistics", () => {
       })
     );
     expect(confirmSpy).toHaveBeenCalledTimes(2);
+    expect(deleteTaskApi).toHaveBeenCalledWith("created-1");
     expect(
       within(myTasksPage).getByRole("group", { name: "Total Tasks" }).textContent
     ).toContain("10");
@@ -593,6 +1039,284 @@ describe("dashboard task statistics", () => {
         name: "Updated My Tasks item, Done",
       })
     ).toBeNull();
+  });
+
+  it("synchronizes validated storage changes across Board, My Tasks, and Calendar", async () => {
+    const user = userEvent.setup();
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+    const firstRender = render(<App />);
+
+    const columns = JSON.parse(
+      localStorage.getItem("taskflow-team-board.columns")
+    );
+    const task = columns.find((column) => column.id === "todo").tasks.shift();
+    const today = new Date();
+    const dueDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    columns.find((column) => column.id === "done").tasks.push({
+      ...task,
+      title: "Updated from another tab",
+      status: "done",
+      dueDate,
+    });
+    const serializedColumns = JSON.stringify(columns);
+
+    localStorage.setItem("taskflow-team-board.columns", serializedColumns);
+    setItemSpy.mockClear();
+    fireEvent(
+      window,
+      new StorageEvent("storage", {
+        key: "taskflow-team-board.columns",
+        newValue: serializedColumns,
+        storageArea: localStorage,
+      })
+    );
+
+    expect(
+      screen.getByRole("article", {
+        name: /Updated from another tab, Done/,
+      })
+    ).toBeTruthy();
+    expect(setItemSpy).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+    expect(
+      screen.getByRole("article", { name: "Updated from another tab, Done" })
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+    const calendarTable = screen.getByRole("table", {
+      name: new Intl.DateTimeFormat(undefined, {
+        month: "long",
+        year: "numeric",
+      }).format(today) + " calendar",
+    });
+    const accessibleDate = new Intl.DateTimeFormat(undefined, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }).format(today);
+    const todayCell = within(calendarTable).getByRole("cell", {
+      name: accessibleDate,
+    });
+    await user.click(
+      within(todayCell).getByRole("button", {
+        name: new RegExp(`^Select ${accessibleDate}`),
+      })
+    );
+    const selectedDay = screen.getByRole("region", {
+      name: `Tasks for ${accessibleDate}`,
+    });
+    expect(
+      within(selectedDay).getByRole("button", {
+        name: `Updated from another tab, Done, High priority, due ${dueDate}. View task details`,
+      })
+    ).toBeTruthy();
+
+    const updatedColumns = JSON.parse(
+      localStorage.getItem("taskflow-team-board.columns")
+    );
+    expect(
+      updatedColumns
+        .flatMap((column) => column.tasks)
+        .find((item) => item.title === "Updated from another tab").dueDate
+    ).toBe(dueDate);
+
+    const staleColumns = JSON.parse(serializedColumns);
+    staleColumns.find((column) => column.id === "done").tasks[0].title =
+      "Older tab snapshot";
+    fireEvent(
+      window,
+      new StorageEvent("storage", {
+        key: "taskflow-team-board.columns",
+        newValue: JSON.stringify(staleColumns),
+      })
+    );
+    expect(
+      within(selectedDay).getByRole("button", {
+        name: new RegExp("^Updated from another tab, Done"),
+      })
+    ).toBeTruthy();
+    await user.click(screen.getByRole("link", { name: /Dashboard/ }));
+    expect(
+      screen.getByRole("article", { name: /Set up React project, Done/ })
+    ).toBeTruthy();
+
+    firstRender.unmount();
+    render(<App />);
+    expect(
+      screen.getByRole("article", {
+        name: /Updated from another tab, Done/,
+      })
+    ).toBeTruthy();
+
+    const invalidColumns = [...updatedColumns];
+    invalidColumns[0] = {
+      ...invalidColumns[0],
+      tasks: [...invalidColumns[0].tasks, updatedColumns[2].tasks[0]],
+    };
+    const invalidSerializedColumns = JSON.stringify(invalidColumns);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    localStorage.setItem(
+      "taskflow-team-board.columns",
+      invalidSerializedColumns
+    );
+    fireEvent(
+      window,
+      new StorageEvent("storage", {
+        key: "taskflow-team-board.columns",
+        newValue: invalidSerializedColumns,
+      })
+    );
+
+    expect(
+      screen.getByRole("article", {
+        name: /Updated from another tab, Done/,
+      })
+    ).toBeTruthy();
+    expect(
+      JSON.parse(localStorage.getItem("taskflow-team-board.columns"))
+    ).toEqual(updatedColumns);
+  });
+
+  it("reflects board moves and deletions in My Tasks and Calendar", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<App />);
+
+    const storedColumns = JSON.parse(
+      localStorage.getItem("taskflow-team-board.columns")
+    );
+    const task = storedColumns[0].tasks.find((item) => item.id === 1);
+    const [year, month, day] = task.dueDate.split("-").map(Number);
+    const dueDateLabel = new Intl.DateTimeFormat(undefined, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(year, month - 1, day));
+    const taskCard = screen.getByRole("article", {
+      name: /Design landing page, To Do/,
+    });
+
+    await user.click(taskCard);
+    await user.keyboard("{Enter}{ArrowRight}{ArrowRight}{Enter}");
+    expect(updateTaskApi).toHaveBeenCalledWith(1, { status: "done" });
+
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+    const myTasksPage = screen.getByRole("region", { name: "My Tasks" });
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Design landing page, Done",
+      })
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+    const calendarTable = screen.getByRole("table");
+    const dueDateCell = within(calendarTable).getByRole("cell", {
+      name: dueDateLabel,
+    });
+    await user.click(
+      within(dueDateCell).getByRole("button", {
+        name: new RegExp(`^Select ${dueDateLabel}`),
+      })
+    );
+    let selectedDay = screen.getByRole("region", {
+      name: `Tasks for ${dueDateLabel}`,
+    });
+    expect(
+      within(selectedDay).getByRole("button", {
+        name: new RegExp("^Design landing page, Done"),
+      })
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+    await user.click(
+      screen.getByRole("button", { name: "Delete Design landing page" })
+    );
+    expect(deleteTaskApi).toHaveBeenCalledWith(1);
+    expect(
+      screen.queryByRole("article", { name: "Design landing page, Done" })
+    ).toBeNull();
+
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+    const refreshedCalendarTable = screen.getByRole("table");
+    const refreshedDueDateCell = within(refreshedCalendarTable).getByRole(
+      "cell",
+      { name: dueDateLabel }
+    );
+    await user.click(
+      within(refreshedDueDateCell).getByRole("button", {
+        name: new RegExp(`^Select ${dueDateLabel}`),
+      })
+    );
+    selectedDay = screen.getByRole("region", {
+      name: `Tasks for ${dueDateLabel}`,
+    });
+    expect(
+      within(selectedDay).queryByRole("button", {
+        name: new RegExp("^Design landing page, Done"),
+      })
+    ).toBeNull();
+  });
+
+  it("keeps a newer tab snapshot when an earlier optimistic move fails", async () => {
+    let rejectMove;
+    updateTaskApi.mockImplementationOnce(
+      () =>
+        new Promise((resolve, reject) => {
+          rejectMove = reject;
+        })
+    );
+    render(<App />);
+
+    dragTaskTo(
+      screen.getByRole("article", { name: /Design landing page, To Do/ }),
+      getTaskColumn("In Progress")
+    );
+    await waitFor(() => expect(updateTaskApi).toHaveBeenCalledTimes(1));
+
+    const externalColumns = JSON.parse(
+      localStorage.getItem("taskflow-team-board.columns")
+    );
+    const inProgressTasks = externalColumns.find(
+      (column) => column.id === "in-progress"
+    ).tasks;
+    const taskIndex = inProgressTasks.findIndex((task) => task.id === 1);
+    const task = inProgressTasks.splice(taskIndex, 1)[0];
+    externalColumns.find((column) => column.id === "done").tasks.push({
+      ...task,
+      title: "Newer external update",
+      status: "done",
+    });
+    const serializedColumns = JSON.stringify(externalColumns);
+    localStorage.setItem("taskflow-team-board.columns", serializedColumns);
+    fireEvent(
+      window,
+      new StorageEvent("storage", {
+        key: "taskflow-team-board.columns",
+        newValue: serializedColumns,
+        storageArea: localStorage,
+      })
+    );
+
+    expect(
+      screen.getByRole("article", {
+        name: /Newer external update, Done/,
+      })
+    ).toBeTruthy();
+
+    await act(async () => {
+      rejectMove(new Error("Earlier move failed."));
+      await Promise.resolve();
+    });
+
+    expect(
+      screen.getByRole("article", {
+        name: /Newer external update, Done/,
+      })
+    ).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("filters My Tasks by status and priority together and clears unmatched filters", async () => {
@@ -652,6 +1376,50 @@ describe("dashboard task statistics", () => {
     expect(within(myTasksPage).getAllByRole("article")).toHaveLength(10);
   });
 
+  it("filters by label, clears filters, and restores filters from the URL", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+
+    const myTasksPage = screen.getByRole("region", { name: "My Tasks" });
+    const labelFilter = within(myTasksPage).getByLabelText("Label");
+    const statusFilter = within(myTasksPage).getByLabelText("Status");
+    const priorityFilter = within(myTasksPage).getByLabelText("Priority");
+
+    await user.selectOptions(labelFilter, "Design");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(2);
+    expect(within(myTasksPage).getByText("Showing 2 of 10 tasks")).toBeTruthy();
+    expect(window.location.search).toContain("label=Design");
+    expect(
+      within(myTasksPage).getByRole("group", { name: "Total Tasks" }).textContent
+    ).toContain("10");
+
+    await user.click(
+      within(myTasksPage).getByRole("button", { name: "Clear Filters" })
+    );
+    expect(labelFilter.value).toBe("all");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(10);
+    expect(window.location.search).toBe("");
+
+    window.history.replaceState(
+      window.history.state,
+      "",
+      "?status=done&label=Planning&priority=Low"
+    );
+    fireEvent.popState(window);
+
+    expect(statusFilter.value).toBe("done");
+    expect(labelFilter.value).toBe("Planning");
+    expect(priorityFilter.value).toBe("Low");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(1);
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Create project structure, Done",
+      })
+    ).toBeTruthy();
+  });
+
   it("searches task titles, descriptions, and labels with filters and updates live", async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -699,6 +1467,7 @@ describe("dashboard task statistics", () => {
       "Distinctive searchable description"
     );
     await user.click(screen.getByRole("button", { name: "Create Task" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(
       within(myTasksPage).getByRole("heading", {
         name: "No tasks match your search",
@@ -760,6 +1529,7 @@ describe("dashboard task statistics", () => {
         });
       }
       await user.click(screen.getByRole("button", { name: "Create Task" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     };
 
     const { unmount } = render(<App />);

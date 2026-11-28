@@ -7,6 +7,7 @@ function TaskColumn({
   searchQuery = "",
   onEdit,
   onDelete,
+  isTaskActionDisabled = false,
   draggedTaskId,
   dropIndicator,
   keyboardMove,
@@ -68,6 +69,7 @@ function TaskColumn({
               columnTitle={column.title}
               onEdit={onEdit}
               onDelete={onDelete}
+              isTaskActionDisabled={isTaskActionDisabled}
               isDragging={draggedTaskId === task.id}
               isKeyboardMoving={
                 keyboardMove &&

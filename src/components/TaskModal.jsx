@@ -13,6 +13,10 @@ function TaskModal({
   isOpen,
   onClose,
   onSave,
+  onClearApiError,
+  onRetry,
+  apiError = "",
+  isSaving = false,
   task,
   defaultDueDate,
   returnFocusRef,
@@ -38,7 +42,7 @@ function TaskModal({
     const elementToRestore = returnFocusRef?.current;
 
     const focusableElements = modal.querySelectorAll(
-      'button, input, textarea, select, [tabindex]:not([tabindex="-1"])'
+      'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])'
     );
 
     const firstElement = focusableElements[0];
@@ -47,7 +51,7 @@ function TaskModal({
     firstElement?.focus();
 
     function handleKeyDown(event) {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !isSaving) {
         onClose();
       }
 
@@ -71,7 +75,7 @@ function TaskModal({
       document.removeEventListener("keydown", handleKeyDown);
       elementToRestore?.focus();
     };
-  }, [isOpen, onClose, returnFocusRef]);
+  }, [isOpen, isSaving, onClose, returnFocusRef]);
 
   if (!isOpen) return null;
 
@@ -84,10 +88,12 @@ function TaskModal({
     }));
 
     setError("");
+    if (apiError) onClearApiError?.();
   }
 
   function handleSubmit(event) {
     event.preventDefault();
+    if (isSaving) return;
 
     const title = formData.title.trim();
 
@@ -101,10 +107,7 @@ function TaskModal({
       return;
     }
 
-    if (
-      isEditing &&
-      !taskStatuses.some((status) => status.value === formData.status)
-    ) {
+    if (!taskStatuses.some((status) => status.value === formData.status)) {
       setError("Select a valid task status.");
       return;
     }
@@ -136,7 +139,7 @@ function TaskModal({
     <div
       className="modal-overlay"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (!isSaving && event.target === event.currentTarget) onClose();
       }}
     >
       <section
@@ -145,7 +148,14 @@ function TaskModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="task-modal-title"
-        aria-describedby={error ? "task-form-error" : undefined}
+        aria-describedby={
+          [
+            error ? "task-form-error" : null,
+            apiError ? "task-api-error" : null,
+          ]
+            .filter(Boolean)
+            .join(" ") || undefined
+        }
       >
         <div className="modal-header">
           <h2 id="task-modal-title">
@@ -156,13 +166,14 @@ function TaskModal({
             type="button"
             className="modal-close"
             onClick={onClose}
+            disabled={isSaving}
             aria-label="Close dialog"
           >
             &times;
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div className="form-group">
             <label htmlFor="task-title">Task Title *</label>
             <input
@@ -201,24 +212,22 @@ function TaskModal({
             />
           </div>
 
-          {isEditing && (
-            <div className="form-group">
-              <label htmlFor="task-status">Status</label>
-              <select
-                id="task-status"
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-                required
-              >
-                {taskStatuses.map((status) => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className="form-group">
+            <label htmlFor="task-status">Status</label>
+            <select
+              id="task-status"
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              required
+            >
+              {taskStatuses.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div className="form-group">
             <label htmlFor="task-priority">Priority</label>
@@ -251,18 +260,35 @@ function TaskModal({
               {error}
             </p>
           )}
+          {apiError && (
+            <div id="task-api-error" className="form-error task-api-error" role="alert">
+              <p>{apiError}</p>
+              <button
+                type="button"
+                onClick={onRetry}
+                disabled={isSaving || !onRetry}
+              >
+                Retry
+              </button>
+            </div>
+          )}
 
           <div className="modal-actions">
             <button
               type="button"
               className="cancel-button"
               onClick={onClose}
+              disabled={isSaving}
             >
               Cancel
             </button>
 
-            <button type="submit" className="save-button">
-              {isEditing ? "Save Changes" : "Create Task"}
+            <button type="submit" className="save-button" disabled={isSaving}>
+              {isSaving
+                ? "Saving..."
+                : isEditing
+                  ? "Save Changes"
+                  : "Create Task"}
             </button>
           </div>
         </form>

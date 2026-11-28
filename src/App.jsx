@@ -1,5 +1,10 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  createTask as createTaskRequest,
+  deleteTask as deleteTaskRequest,
+  updateTask as updateTaskRequest,
+} from "./api/taskApi";
 import CalendarPage from "./components/CalendarPage";
 import Header from "./components/Header";
 import HelpCenter from "./components/HelpCenter";
@@ -14,6 +19,12 @@ import {
   saveApplicationPreferences,
 } from "./utils/applicationPreferencesStorage";
 import { loadProfile, saveProfile } from "./utils/profileStorage";
+import {
+  TASK_STORAGE_KEY,
+  loadTasks,
+  saveTasks,
+  subscribeToTaskChanges,
+} from "./utils/taskStorage";
 import {
   assignMissingDueDates,
   getStatusBasedDueDate,
@@ -54,7 +65,6 @@ const taskColumns = [
   },
 ];
 
-const TASK_COLUMNS_STORAGE_KEY = "taskflow-team-board.columns";
 const NOTIFICATIONS_STORAGE_KEY = "taskflow-team-board.notifications";
 const THEME_PREFERENCE_STORAGE_KEY =
   document.documentElement.dataset.themeStorageKey ||
@@ -118,64 +128,65 @@ function getSystemTheme() {
     : "light";
 }
 
-function loadTaskColumns() {
-  try {
-    const savedColumns = window.localStorage.getItem(TASK_COLUMNS_STORAGE_KEY);
-    if (savedColumns === null) {
-      return assignMissingDueDates(taskColumns);
+function normalizeTaskColumns(parsedColumns) {
+  if (!Array.isArray(parsedColumns)) {
+    throw new Error("Saved task columns are not a list.");
+  }
+
+  const restoredColumns = taskColumns.map((column) => {
+    const savedColumn = parsedColumns.find((item) => item?.id === column.id);
+
+    if (!savedColumn || !Array.isArray(savedColumn.tasks)) {
+      throw new Error(`Saved tasks for "${column.id}" are invalid.`);
     }
 
-    const parsedColumns = JSON.parse(savedColumns);
-    if (!Array.isArray(parsedColumns)) {
-      throw new Error("Saved task columns are not a list.");
-    }
-
-    const restoredColumns = taskColumns.map((column) => {
-      const savedColumn = parsedColumns.find(
-        (item) => item?.id === column.id
-      );
-
-      if (!savedColumn || !Array.isArray(savedColumn.tasks)) {
-        throw new Error(`Saved tasks for "${column.id}" are invalid.`);
-      }
-
-      return {
-        ...column,
-        tasks: savedColumn.tasks.map((task) => {
-          if (
-            !task ||
-            (typeof task.id !== "string" && typeof task.id !== "number") ||
-            typeof task.title !== "string" ||
-            typeof task.label !== "string" ||
-            typeof task.priority !== "string" ||
-            (task.dueDate != null &&
-              task.dueDate !== "" &&
-              !isValidDueDate(task.dueDate))
-          ) {
-            throw new Error(`A saved task in "${column.id}" is invalid.`);
-          }
-
-          return {
-            ...task,
-            dueDate: task.dueDate ?? "",
-            status: column.id,
-          };
-        }),
-      };
-    });
-
-    const taskIds = new Set();
-    for (const column of restoredColumns) {
-      for (const task of column.tasks) {
-        const taskId = String(task.id);
-        if (taskIds.has(taskId)) {
-          throw new Error(`Saved task ID "${taskId}" appears more than once.`);
+    return {
+      ...column,
+      tasks: savedColumn.tasks.map((task) => {
+        if (
+          !task ||
+          (typeof task.id !== "string" && typeof task.id !== "number") ||
+          typeof task.title !== "string" ||
+          typeof task.label !== "string" ||
+          typeof task.priority !== "string" ||
+          (task.dueDate != null &&
+            task.dueDate !== "" &&
+            !isValidDueDate(task.dueDate))
+        ) {
+          throw new Error(`A saved task in "${column.id}" is invalid.`);
         }
-        taskIds.add(taskId);
-      }
-    }
 
-    return assignMissingDueDates(restoredColumns);
+        return {
+          ...task,
+          dueDate: task.dueDate ?? "",
+          status: column.id,
+        };
+      }),
+    };
+  });
+
+  const taskIds = new Set();
+  for (const column of restoredColumns) {
+    for (const task of column.tasks) {
+      const taskId = String(task.id);
+      if (taskIds.has(taskId)) {
+        throw new Error(`Saved task ID "${taskId}" appears more than once.`);
+      }
+      taskIds.add(taskId);
+    }
+  }
+
+  return assignMissingDueDates(restoredColumns);
+}
+
+function loadTaskColumns() {
+  const savedColumns = loadTasks();
+  if (savedColumns === null) {
+    return assignMissingDueDates(taskColumns);
+  }
+
+  try {
+    return normalizeTaskColumns(savedColumns);
   } catch (error) {
     console.error("Unable to restore the saved task board.", error);
     return assignMissingDueDates(taskColumns);
@@ -194,53 +205,55 @@ function moveTaskToPosition(previousColumns, taskId, destinationColumnId, insert
     return previousColumns;
   }
 
-  const sourceColumn = previousColumns[sourceColumnIndex];
-  const task = sourceColumn.tasks.find(
+  const task = previousColumns[sourceColumnIndex].tasks.find(
     (item) => String(item.id) === String(taskId)
   );
-  const sourceTasks = sourceColumn.tasks.filter(
-    (item) => String(item.id) !== String(taskId)
+  const taskIdString = String(taskId);
+  const nextTaskLists = previousColumns.map((column) =>
+    column.tasks.filter((item) => String(item.id) !== taskIdString)
   );
-
-  if (sourceColumnIndex === destinationColumnIndex) {
-    const position = Math.max(0, Math.min(insertionIndex, sourceTasks.length));
-    const reorderedTasks = [...sourceTasks];
-    reorderedTasks.splice(position, 0, task);
-
-    if (
-      reorderedTasks.every(
-        (item, index) => item.id === sourceColumn.tasks[index].id
-      )
-    ) {
-      return previousColumns;
-    }
-
-    return previousColumns.map((column, index) =>
-      index === sourceColumnIndex
-        ? { ...column, tasks: reorderedTasks }
-        : column
-    );
-  }
-
   const destinationColumn = previousColumns[destinationColumnIndex];
-  const destinationTasks = [...destinationColumn.tasks];
-  const position = Math.max(0, Math.min(insertionIndex, destinationTasks.length));
-  destinationTasks.splice(position, 0, {
-    ...task,
-    status: destinationColumn.id,
+  const destinationTasks = nextTaskLists[destinationColumnIndex];
+  const requestedPosition = Number.isFinite(insertionIndex)
+    ? Math.trunc(insertionIndex)
+    : destinationTasks.length;
+  const position = Math.max(0, Math.min(requestedPosition, destinationTasks.length));
+  const movedTask =
+    sourceColumnIndex === destinationColumnIndex
+      ? task
+      : { ...task, status: destinationColumn.id };
+  destinationTasks.splice(position, 0, movedTask);
+
+  const isUnchanged = previousColumns.every((column, columnIndex) => {
+    const nextTasks = nextTaskLists[columnIndex];
+    return (
+      column.tasks.length === nextTasks.length &&
+      column.tasks.every((item, index) => item === nextTasks[index])
+    );
   });
+  if (isUnchanged) return previousColumns;
 
-  return previousColumns.map((column, index) => {
-    if (index === sourceColumnIndex) {
-      return { ...column, tasks: sourceTasks };
-    }
-
-    if (index === destinationColumnIndex) {
-      return { ...column, tasks: destinationTasks };
-    }
-
-    return column;
+  return previousColumns.map((column, columnIndex) => {
+    const nextTasks = nextTaskLists[columnIndex];
+    const tasksUnchanged =
+      column.tasks.length === nextTasks.length &&
+      column.tasks.every((item, index) => item === nextTasks[index]);
+    return tasksUnchanged ? column : { ...column, tasks: nextTasks };
   });
+}
+
+function getTaskPosition(columns, taskId) {
+  const column = columns.find((item) =>
+    item.tasks.some((task) => String(task.id) === String(taskId))
+  );
+  if (!column) return null;
+
+  return {
+    columnId: column.id,
+    index: column.tasks.findIndex(
+      (task) => String(task.id) === String(taskId)
+    ),
+  };
 }
 
 function getTaskMovementAnnouncement(previousColumns, nextColumns, taskId) {
@@ -373,6 +386,12 @@ function App() {
   const [defaultTaskDueDate, setDefaultTaskDueDate] = useState("");
   const [notifications, setNotifications] = useState(loadNotifications);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isTaskRequestPending, setIsTaskRequestPending] = useState(false);
+  const [taskRequestMessage, setTaskRequestMessage] = useState("");
+  const [taskApiError, setTaskApiError] = useState("");
+  const [taskMoveError, setTaskMoveError] = useState("");
+  const [pendingTaskMoveCount, setPendingTaskMoveCount] = useState(0);
+  const [taskFeedback, setTaskFeedback] = useState("");
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dropTargetColumnId, setDropTargetColumnId] = useState(null);
   const [dropIndicator, setDropIndicator] = useState(null);
@@ -383,6 +402,10 @@ function App() {
   const taskCardRefs = useRef(new Map());
   const pendingKeyboardFocusTaskId = useRef(null);
   const lastTaskAnnouncementRef = useRef(null);
+  const taskRequestPendingRef = useRef(false);
+  const taskMoveQueuesRef = useRef(new Map());
+  const retryTaskRequestRef = useRef(null);
+  const columnsRef = useRef(columns);
   const [selectedTask, setSelectedTask] = useState(null);
   const taskStats = useMemo(() => {
     const counts = columns.reduce(
@@ -407,6 +430,10 @@ function App() {
           ? 0
           : Math.round((counts.completed / counts.total) * 100),
     };
+  }, [columns]);
+
+  useLayoutEffect(() => {
+    columnsRef.current = columns;
   }, [columns]);
 
   useLayoutEffect(() => {
@@ -473,15 +500,48 @@ function App() {
     return () => window.clearTimeout(timeoutId);
   }, [taskAnnouncement]);
 
+  useEffect(
+    () =>
+      subscribeToTaskChanges((savedColumns) => {
+        let synchronizedColumns;
+        try {
+          const latestSavedValue = window.localStorage.getItem(
+            TASK_STORAGE_KEY
+          );
+          if (
+            latestSavedValue === null ||
+            JSON.stringify(JSON.parse(latestSavedValue)) !==
+              JSON.stringify(savedColumns)
+          ) {
+            return;
+          }
+
+          synchronizedColumns = normalizeTaskColumns(savedColumns);
+        } catch (error) {
+          console.error("Unable to synchronize saved task columns.", error);
+          saveTasks(columnsRef.current);
+          return;
+        }
+
+        if (
+          JSON.stringify(synchronizedColumns) ===
+          JSON.stringify(columnsRef.current)
+        ) {
+          return;
+        }
+
+        cancelPendingTaskMoves();
+        setDraggedTaskId(null);
+        setDropTargetColumnId(null);
+        setDropIndicator(null);
+        setKeyboardMove(null);
+        commitTaskColumns(synchronizedColumns);
+      }),
+    []
+  );
+
   useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        TASK_COLUMNS_STORAGE_KEY,
-        JSON.stringify(columns)
-      );
-    } catch (error) {
-      console.error("Unable to save the task board.", error);
-    }
+    saveTasks(columns);
   }, [columns]);
 
   useEffect(() => {
@@ -582,6 +642,10 @@ function App() {
   }
 
   function openCreateModal() {
+    if (taskRequestPendingRef.current || taskMoveQueuesRef.current.size > 0) return;
+    setTaskApiError("");
+    setTaskFeedback("");
+    retryTaskRequestRef.current = null;
     returnFocusRef.current = triggerRef.current;
     setSelectedTask(null);
     const todoTaskCount =
@@ -593,6 +657,10 @@ function App() {
   }
 
   function openEditModal(task, triggerElement) {
+    if (taskRequestPendingRef.current || taskMoveQueuesRef.current.size > 0) return;
+    setTaskApiError("");
+    setTaskFeedback("");
+    retryTaskRequestRef.current = null;
     returnFocusRef.current = triggerElement;
     setSelectedTask(task);
     setIsModalOpen(true);
@@ -603,87 +671,295 @@ function App() {
     setSelectedTask(null);
   }
 
-  function saveTask(taskData) {
-    if (selectedTask) {
-      const sourceColumn = columns.find((column) =>
-        column.tasks.some(
-          (task) => String(task.id) === String(selectedTask.id)
-        )
-      );
-      const destinationColumn = columns.find(
-        (column) => column.id === taskData.status
-      );
-      const updatedColumns = columns.map((column) => ({
-        ...column,
-        tasks: column.tasks.map((task) =>
-          task.id === selectedTask.id ? { ...task, ...taskData } : task
-        ),
-      }));
-      const nextColumns =
-        sourceColumn &&
-          destinationColumn &&
-          sourceColumn.id !== destinationColumn.id
-          ? moveTaskToPosition(
-            updatedColumns,
-            selectedTask.id,
-            destinationColumn.id,
-            destinationColumn.tasks.length
-          )
-          : updatedColumns;
+  async function runTaskRequest(
+    request,
+    onSuccess,
+    loadingMessage,
+    successMessage
+  ) {
+    if (
+      taskRequestPendingRef.current ||
+      taskMoveQueuesRef.current.size > 0
+    ) return false;
 
-      recordTaskStatusChange(columns, nextColumns, selectedTask.id);
-      addNotification(`Task updated: ${taskData.title}.`);
-      setColumns(nextColumns);
-    } else {
-      // Create new task in To Do
-      const newTask = {
-        id: crypto.randomUUID(),
-        ...taskData,
-        dueDate:
-          taskData.dueDate ||
-          getStatusBasedDueDate(
-            "todo",
-            columns.find((column) => column.id === "todo")?.tasks.length || 0
-          ),
-        status: "todo",
+    taskRequestPendingRef.current = true;
+    setIsTaskRequestPending(true);
+    setTaskRequestMessage(loadingMessage);
+    setTaskApiError("");
+    setTaskFeedback("");
+
+    let response;
+    try {
+      response = await request();
+    } catch (error) {
+      setTaskApiError(
+        error instanceof Error && error.message
+          ? error.message
+          : "The task request failed. Please try again."
+      );
+      retryTaskRequestRef.current = () => {
+        void runTaskRequest(
+          request,
+          onSuccess,
+          loadingMessage,
+          successMessage
+        );
       };
-
-      addNotification(`Task created: ${newTask.title}.`);
-      setColumns((previousColumns) =>
-        previousColumns.map((column) =>
-          column.id === "todo"
-            ? { ...column, tasks: [...column.tasks, newTask] }
-            : column
-        )
-      );
+      return false;
+    } finally {
+      taskRequestPendingRef.current = false;
+      setIsTaskRequestPending(false);
+      setTaskRequestMessage("");
     }
 
-    closeModal();
+    retryTaskRequestRef.current = null;
+    setTaskApiError("");
+    onSuccess(response);
+    setTaskFeedback(successMessage);
+    return true;
+  }
+
+  function saveTask(taskData) {
+    if (taskMoveQueuesRef.current.size > 0) return;
+    const editingTask = selectedTask;
+    const status = taskData.status || "todo";
+    const statusTaskCount =
+      columnsRef.current.find((column) => column.id === status)?.tasks.length ||
+      0;
+    const taskPayload = {
+      ...taskData,
+      description: taskData.description.trim(),
+      dueDate:
+        taskData.dueDate || getStatusBasedDueDate(status, statusTaskCount),
+      label: taskData.label.trim(),
+      status,
+    };
+    const request = editingTask
+      ? () => updateTaskRequest(editingTask.id, taskPayload)
+      : () => createTaskRequest(taskPayload);
+    const onSuccess = (savedTask) => {
+      if (editingTask) {
+        const currentColumns = columnsRef.current;
+        const updatedTask = {
+          ...editingTask,
+          ...savedTask,
+          id: editingTask.id,
+        };
+        const sourceColumn = currentColumns.find((column) =>
+          column.tasks.some(
+            (task) => String(task.id) === String(editingTask.id)
+          )
+        );
+        const destinationColumn = currentColumns.find(
+          (column) => column.id === updatedTask.status
+        );
+        const updatedColumns = currentColumns.map((column) => ({
+          ...column,
+          tasks: column.tasks.map((task) =>
+            String(task.id) === String(editingTask.id) ? updatedTask : task
+          ),
+        }));
+        const nextColumns =
+          sourceColumn &&
+          destinationColumn &&
+          sourceColumn.id !== destinationColumn.id
+            ? moveTaskToPosition(
+                updatedColumns,
+                editingTask.id,
+                destinationColumn.id,
+                destinationColumn.tasks.length
+              )
+            : updatedColumns;
+
+        recordTaskStatusChange(currentColumns, nextColumns, editingTask.id);
+        addNotification(`Task updated: ${updatedTask.title}.`);
+        setColumns(nextColumns);
+      } else {
+        const createdTask = { ...taskPayload, ...savedTask };
+        const targetColumn = createdTask.status || "todo";
+        setColumns((previousColumns) =>
+          previousColumns.map((column) =>
+            column.id === targetColumn &&
+            !column.tasks.some(
+              (task) => String(task.id) === String(createdTask.id)
+            )
+              ? { ...column, tasks: [...column.tasks, createdTask] }
+              : column
+          )
+        );
+        addNotification(`Task created: ${createdTask.title}.`);
+      }
+
+      closeModal();
+    };
+
+    void runTaskRequest(
+      request,
+      onSuccess,
+      editingTask ? "Saving task..." : "Creating task...",
+      editingTask ? "Task updated." : "Task created."
+    );
   }
 
   function deleteTask(taskId) {
+    if (taskRequestPendingRef.current || taskMoveQueuesRef.current.size > 0) return;
     const confirmed = window.confirm(
       "Are you sure you want to delete this task?"
     );
 
     if (!confirmed) return;
 
-    const deletedTask = columns
+    const deletedTask = columnsRef.current
       .flatMap((column) => column.tasks)
-      .find((task) => task.id === taskId);
-    if (deletedTask) {
-      addNotification(`Task deleted: ${deletedTask.title}.`);
+      .find((task) => String(task.id) === String(taskId));
+    if (!deletedTask) return;
+
+    void runTaskRequest(
+      () => deleteTaskRequest(taskId),
+      () => {
+        setColumns((previousColumns) =>
+          previousColumns.map((column) => ({
+            ...column,
+            tasks: column.tasks.filter(
+              (task) => String(task.id) !== String(taskId)
+            ),
+          }))
+        );
+        addNotification(`Task deleted: ${deletedTask.title}.`);
+      },
+      "Deleting task...",
+      "Task deleted."
+    );
+  }
+
+  function commitTaskColumns(nextColumns) {
+    if (nextColumns === columnsRef.current) return;
+    columnsRef.current = nextColumns;
+    setColumns(nextColumns);
+  }
+
+  function cancelPendingTaskMoves() {
+    taskMoveQueuesRef.current.clear();
+    setPendingTaskMoveCount(0);
+  }
+
+  function moveTask(taskId, destinationColumnId, insertionIndex, focusAfterMove = false) {
+    if (taskRequestPendingRef.current) return;
+
+    const currentColumns = columnsRef.current;
+    const previousPosition = getTaskPosition(currentColumns, taskId);
+    if (!previousPosition) return;
+
+    const destinationColumn = currentColumns.find(
+      (column) => column.id === destinationColumnId
+    );
+    if (!destinationColumn) return;
+
+    const nextColumns = moveTaskToPosition(
+      currentColumns,
+      taskId,
+      destinationColumnId,
+      insertionIndex
+    );
+    if (nextColumns === currentColumns) return;
+
+    const nextPosition = getTaskPosition(nextColumns, taskId);
+    if (!nextPosition) return;
+
+    if (focusAfterMove) {
+      pendingKeyboardFocusTaskId.current = taskId;
     }
 
-    setColumns((previousColumns) =>
-      previousColumns.map((column) => ({
-        ...column,
-        tasks: column.tasks.filter((task) => task.id !== taskId),
-      }))
+    commitTaskColumns(nextColumns);
+    announceTaskMovement(currentColumns, nextColumns, taskId);
+    setTaskMoveError("");
+
+    if (previousPosition.columnId === nextPosition.columnId) return;
+
+    const taskKey = String(taskId);
+    let moveState = taskMoveQueuesRef.current.get(taskKey);
+    if (!moveState) {
+      moveState = {
+        sequence: 0,
+        queue: Promise.resolve(),
+        confirmedPosition: previousPosition,
+      };
+      taskMoveQueuesRef.current.set(taskKey, moveState);
+      setPendingTaskMoveCount(taskMoveQueuesRef.current.size);
+    }
+
+    moveState.sequence += 1;
+    const sequence = moveState.sequence;
+    const destinationId = nextPosition.columnId;
+    const requestMove = () =>
+      taskMoveQueuesRef.current.get(taskKey) === moveState
+        ? updateTaskRequest(taskId, { status: destinationId })
+        : undefined;
+    moveState.queue = moveState.queue.then(requestMove, requestMove).then(
+      () => {
+        if (taskMoveQueuesRef.current.get(taskKey) !== moveState) return;
+
+        const confirmedPosition = nextPosition;
+        const previousConfirmedPosition = moveState.confirmedPosition;
+        moveState.confirmedPosition = confirmedPosition;
+
+        if (moveState.sequence !== sequence) return;
+
+        if (previousConfirmedPosition.columnId !== confirmedPosition.columnId) {
+          const task = columnsRef.current
+            .flatMap((column) => column.tasks)
+            .find((item) => String(item.id) === taskKey);
+          const sourceColumn = columnsRef.current.find(
+            (column) => column.id === previousConfirmedPosition.columnId
+          );
+          const targetColumn = columnsRef.current.find(
+            (column) => column.id === confirmedPosition.columnId
+          );
+          if (task && sourceColumn && targetColumn) {
+            addNotification(
+              `${task.title} moved from ${sourceColumn.title} to ${targetColumn.title}.`
+            );
+          }
+        }
+
+        taskMoveQueuesRef.current.delete(taskKey);
+        setPendingTaskMoveCount(taskMoveQueuesRef.current.size);
+      },
+      (error) => {
+        if (
+          taskMoveQueuesRef.current.get(taskKey) !== moveState ||
+          moveState.sequence !== sequence
+        ) return;
+
+        const latestColumns = columnsRef.current;
+        const rollbackColumns = moveTaskToPosition(
+          latestColumns,
+          taskId,
+          moveState.confirmedPosition.columnId,
+          moveState.confirmedPosition.index
+        );
+        if (rollbackColumns !== latestColumns) {
+          commitTaskColumns(rollbackColumns);
+          announceTaskMovement(latestColumns, rollbackColumns, taskId);
+        }
+
+        const taskTitle =
+          latestColumns
+            .flatMap((column) => column.tasks)
+            .find((item) => String(item.id) === taskKey)?.title || "Task";
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : "Please try moving it again.";
+        setTaskMoveError(`Unable to move ${taskTitle}. ${message}`);
+        taskMoveQueuesRef.current.delete(taskKey);
+        setPendingTaskMoveCount(taskMoveQueuesRef.current.size);
+      }
     );
   }
 
   function handleTaskDragStart(taskId, event) {
+    if (taskRequestPendingRef.current) return;
     event.dataTransfer.setData("text/plain", String(taskId));
     event.dataTransfer.effectAllowed = "move";
     setDraggedTaskId(taskId);
@@ -729,6 +1005,7 @@ function App() {
     event.preventDefault();
     event.stopPropagation();
     const taskId = event.dataTransfer.getData("text/plain");
+    const currentColumns = columnsRef.current;
     let targetPosition = null;
 
     if (targetTaskId !== null) {
@@ -738,38 +1015,31 @@ function App() {
     }
 
     if (taskId) {
-      const sourceColumnIndex = columns.findIndex((column) =>
+      const sourceColumnIndex = currentColumns.findIndex((column) =>
         column.tasks.some((task) => String(task.id) === taskId)
       );
-      const destinationColumnIndex = columns.findIndex(
+      const destinationColumnIndex = currentColumns.findIndex(
         (column) => column.id === columnId
       );
 
       if (sourceColumnIndex !== -1 && destinationColumnIndex !== -1) {
-        const destinationTasks = columns[destinationColumnIndex].tasks.filter(
+        const destinationTasks = currentColumns[destinationColumnIndex].tasks.filter(
           (task) =>
-            sourceColumnIndex !== destinationColumnIndex ||
             String(task.id) !== taskId
         );
-        const targetIndex = targetTaskId === null
-          ? destinationTasks.length
-          : destinationTasks.findIndex(
+        const targetIndex =
+          targetTaskId === null
+            ? destinationTasks.length
+            : destinationTasks.findIndex(
             (item) => String(item.id) === String(targetTaskId)
           );
 
         if (targetIndex !== -1) {
-          const nextColumns = moveTaskToPosition(
-            columns,
+          moveTask(
             taskId,
             columnId,
             targetIndex + (targetPosition === "after" ? 1 : 0)
           );
-
-          if (nextColumns !== columns) {
-            setColumns(nextColumns);
-            announceTaskMovement(columns, nextColumns, taskId);
-            recordTaskStatusChange(columns, nextColumns, taskId);
-          }
         }
       }
     }
@@ -780,7 +1050,10 @@ function App() {
   }
 
   function handleTaskKeyDown(taskId, event) {
-    if (event.target !== event.currentTarget) return;
+    if (
+      event.target !== event.currentTarget ||
+      taskRequestPendingRef.current
+    ) return;
 
     const activeMove =
       keyboardMove &&
@@ -818,19 +1091,12 @@ function App() {
         return;
       }
 
-      const nextColumns = moveTaskToPosition(
-        columns,
+      moveTask(
         keyboardMove.taskId,
         keyboardMove.columnId,
-        keyboardMove.index
+        keyboardMove.index,
+        true
       );
-
-      if (nextColumns !== columns) {
-        pendingKeyboardFocusTaskId.current = keyboardMove.taskId;
-        setColumns(nextColumns);
-        announceTaskMovement(columns, nextColumns, keyboardMove.taskId);
-        recordTaskStatusChange(columns, nextColumns, keyboardMove.taskId);
-      }
 
       setKeyboardMove(null);
       return;
@@ -997,6 +1263,39 @@ function App() {
           onNotificationsRead={markNotificationsRead}
         />
 
+        {isTaskRequestPending && (
+          <p className="task-request-status" role="status" aria-live="polite">
+            {taskRequestMessage}
+          </p>
+        )}
+        {pendingTaskMoveCount > 0 && (
+          <p className="task-request-status" role="status" aria-live="polite">
+            Saving task movement...
+          </p>
+        )}
+        {taskApiError && !isModalOpen && (
+          <div className="task-request-error" role="alert">
+            <p>{taskApiError}</p>
+            <button
+              type="button"
+              onClick={() => retryTaskRequestRef.current?.()}
+              disabled={isTaskRequestPending}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        {taskMoveError && (
+          <div className="task-request-error" role="alert">
+            <p>{taskMoveError}</p>
+          </div>
+        )}
+        {taskFeedback && (
+          <p className="task-request-feedback" role="status" aria-live="polite">
+            {taskFeedback}
+          </p>
+        )}
+
         {activePage === "help" ? (
           <HelpCenter onReturnToDashboard={() => setActivePage("dashboard")} />
         ) : activePage === "settings" ? (
@@ -1035,6 +1334,9 @@ function App() {
             onEditTask={openEditModal}
             onDeleteTask={deleteTask}
             createButtonRef={triggerRef}
+            isTaskActionDisabled={
+              isTaskRequestPending || pendingTaskMoveCount > 0
+            }
           />
         ) : (
           <section className="dashboard-content" id="dashboard">
@@ -1053,6 +1355,7 @@ function App() {
                 ref={triggerRef}
                 className="add-task-button"
                 onClick={openCreateModal}
+                disabled={isTaskRequestPending || pendingTaskMoveCount > 0}
                 type="button"
               >
                 <span>+</span> Add Task
@@ -1074,6 +1377,9 @@ function App() {
                   searchQuery={taskSearchQuery}
                   onEdit={openEditModal}
                   onDelete={deleteTask}
+                  isTaskActionDisabled={
+                    isTaskRequestPending || pendingTaskMoveCount > 0
+                  }
                   draggedTaskId={draggedTaskId}
                   dropIndicator={dropIndicator}
                   keyboardMove={keyboardMove}
@@ -1126,6 +1432,13 @@ function App() {
             isOpen={isModalOpen}
             onClose={closeModal}
             onSave={saveTask}
+            onClearApiError={() => {
+              setTaskApiError("");
+              retryTaskRequestRef.current = null;
+            }}
+            onRetry={() => retryTaskRequestRef.current?.()}
+            apiError={taskApiError}
+            isSaving={isTaskRequestPending}
             task={selectedTask}
             defaultDueDate={defaultTaskDueDate}
             returnFocusRef={returnFocusRef}

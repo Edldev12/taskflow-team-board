@@ -115,7 +115,7 @@
 
 .header-theme-button[aria-pressed="true"] {
   background: #dceeff;
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .header-theme-button:focus-visible {
@@ -257,7 +257,7 @@
   place-items: center;
   border-radius: 50%;
   background: #dceeff;
-  color: #2876bd;
+  color: #1d5b94;
   font-weight: 700;
 }
 @media (max-width: 1000px) {

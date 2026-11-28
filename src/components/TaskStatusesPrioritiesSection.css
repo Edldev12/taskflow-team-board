@@ -65,17 +65,17 @@
 
 .help-status-card--todo .help-status-card-icon {
   background: #eaf4ff;
-  color: #3978b5;
+  color: #28689f;
 }
 
 .help-status-card--in-progress .help-status-card-icon {
   background: #fff5e6;
-  color: #b98132;
+  color: #825914;
 }
 
 .help-status-card--done .help-status-card-icon {
   background: #e9f7ef;
-  color: #39875c;
+  color: #2f704b;
 }
 
 .help-status-card h4 {
@@ -109,17 +109,17 @@
 
 .help-status-badge--todo {
   background: #eaf4ff;
-  color: #3978b5;
+  color: #28689f;
 }
 
 .help-status-badge--in-progress {
   background: #fff5e6;
-  color: #b98132;
+  color: #825914;
 }
 
 .help-status-badge--done {
   background: #e9f7ef;
-  color: #39875c;
+  color: #2f704b;
 }
 
 .help-status-dot {
@@ -180,7 +180,7 @@
   width: 36px;
   height: 36px;
   background: #eaf4ff;
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .help-status-movement-note h3,

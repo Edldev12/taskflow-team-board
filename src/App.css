@@ -39,7 +39,7 @@
   flex-shrink: 0;
   border-radius: 12px;
   background: #dceeff;
-  color: #2876bd;
+  color: #1d5b94;
   font-size: 30px;
   font-weight: 800;
 }
@@ -93,7 +93,7 @@
 .nav-link:hover,
 .nav-link.active {
   background: #eaf4ff;
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .nav-link:focus-visible {
@@ -120,6 +120,47 @@
 .dashboard-content {
   width: 100%;
   padding: 35px 30px;
+}
+
+.task-request-status,
+.task-request-feedback {
+  margin: 0;
+  padding: 10px 30px;
+  color: var(--muted);
+}
+
+.task-request-feedback {
+  color: var(--text);
+}
+
+.task-request-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 30px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.task-request-error p {
+  margin: 0;
+}
+
+.task-request-error button {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.task-request-error button:focus-visible {
+  outline: 2px solid #2876bd;
+  outline-offset: 2px;
 }
 
 .dashboard-heading {
@@ -225,7 +266,7 @@
   place-items: center;
   border-radius: 10px;
   background: #eaf4ff;
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .task-stats-card p {
@@ -243,12 +284,12 @@
 
 .task-stats-card--completed .task-stats-icon {
   background: #e9f7ef;
-  color: #39875c;
+  color: #2f704b;
 }
 
 .task-stats-card--pending .task-stats-icon {
   background: #fff5e6;
-  color: #b98132;
+  color: #825914;
 }
 
 .add-task-button {
@@ -444,22 +485,22 @@
 
 .task-label {
   background: #eaf3fc;
-  color: #3978b5;
+  color: #28689f;
 }
 
 .priority.high {
   background: #fff0ed;
-  color: #d66d5c;
+  color: #a64435;
 }
 
 .priority.medium {
   background: #fff5e6;
-  color: #b98132;
+  color: #825914;
 }
 
 .priority.low {
   background: #e9f7ef;
-  color: #39875c;
+  color: #2f704b;
 }
 
 /* Dark theme */
@@ -597,7 +638,7 @@
 }
 
 .task-delete-button {
-  color: #dc5145;
+  color: #b3362e;
 }
 
 .app-layout[data-theme="dark"] .task-delete-button {
@@ -606,6 +647,11 @@
 
 .task-card-actions button:hover {
   background: var(--background);
+}
+
+.task-card-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .task-card-actions button:focus-visible {
@@ -658,7 +704,7 @@
   place-items: center;
   border-radius: 50%;
   background: #e9f7ef;
-  color: #39875c;
+  color: #2f704b;
   font-size: 14px;
   font-weight: 700;
 }

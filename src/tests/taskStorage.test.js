@@ -37,6 +37,14 @@ describe("taskStorage", () => {
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual(sampleColumns);
   });
 
+  it("does not rewrite an unchanged snapshot", () => {
+    saveTasks(sampleColumns);
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+
+    expect(saveTasks(sampleColumns)).toBe(true);
+    expect(setItemSpy).not.toHaveBeenCalled();
+  });
+
   it("loads saved columns from localStorage", () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sampleColumns));
 

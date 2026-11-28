@@ -55,7 +55,7 @@
   place-items: center;
   border-radius: 9px;
   background: #eaf4ff;
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .help-drag-step h3,
@@ -117,15 +117,15 @@
 }
 
 .help-dnd-column--todo h3 {
-  color: #3978b5;
+  color: #28689f;
 }
 
 .help-dnd-column--progress h3 {
-  color: #b98132;
+  color: #825914;
 }
 
 .help-dnd-column--done h3 {
-  color: #39875c;
+  color: #2f704b;
 }
 
 .help-dnd-dot {
@@ -171,7 +171,7 @@
   padding: 8px;
   border: 1px dashed #72b7f5;
   border-radius: 7px;
-  color: #3978b5;
+  color: #28689f;
   font-size: 10px;
   text-align: center;
 }
@@ -212,7 +212,7 @@
 
 .help-dnd-detail-heading svg {
   flex: none;
-  color: #2876bd;
+  color: #1d5b94;
 }
 
 .help-dnd-feedback {
@@ -229,7 +229,7 @@
 .help-dnd-feedback > svg {
   flex: none;
   margin-top: 1px;
-  color: #c65e4d;
+  color: #a64435;
 }
 
 .help-dnd-feedback h3 {
