@@ -25,6 +25,29 @@ vi.mock("../api/taskApi", () => ({
 let originalWindowMatchMedia;
 let createdTaskId = 0;
 
+function getTaskColumn(title) {
+  return screen.getByRole("heading", { name: title }).closest(".task-column");
+}
+
+function createDataTransfer() {
+  const transferData = {};
+  return {
+    setData: vi.fn((type, value) => {
+      transferData[type] = value;
+    }),
+    getData: vi.fn((type) => transferData[type] || ""),
+    effectAllowed: "",
+    dropEffect: "",
+  };
+}
+
+function dragTaskTo(task, destination, options = {}) {
+  const dataTransfer = createDataTransfer();
+  fireEvent.dragStart(task, { dataTransfer });
+  fireEvent.drop(destination, { dataTransfer, ...options });
+  return dataTransfer;
+}
+
 async function checkProgressAndReturnToDashboard(user, expected) {
   await user.click(screen.getByRole("link", { name: /Your Progress/ }));
 
@@ -298,6 +321,9 @@ describe("dashboard task statistics", () => {
     });
     await user.click(task);
     await user.keyboard("{Enter}{ArrowRight}{Enter}");
+    expect(
+      document.querySelector(".task-movement-notification").textContent
+    ).toContain("Design landing page moved from To Do to In Progress.");
     await checkProgressAndReturnToDashboard(user, {
       total: 10,
       completed: 3,
@@ -322,6 +348,7 @@ describe("dashboard task statistics", () => {
     });
     await user.click(task);
     await user.keyboard("{Enter}{ArrowLeft}{Enter}");
+    expect(updateTaskApi).toHaveBeenCalledWith(1, { status: "in-progress" });
     await checkProgressAndReturnToDashboard(user, {
       total: 10,
       completed: 3,
@@ -340,6 +367,234 @@ describe("dashboard task statistics", () => {
       pending: 7,
       percentage: 30,
     });
+  });
+
+  it("reorders tasks within a column without calling the API", () => {
+    render(<App />);
+    const todoColumn = getTaskColumn("To Do");
+    const [firstTask] = within(todoColumn).getAllByRole("article");
+    const targetTask = within(todoColumn).getByRole("article", {
+      name: /Review project requirements/,
+    });
+    vi.spyOn(targetTask, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      bottom: 100,
+      left: 0,
+      right: 100,
+      width: 100,
+      height: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    dragTaskTo(firstTask, targetTask, { clientY: 90 });
+
+    const reorderedTasks = within(todoColumn).getAllByRole("article");
+    expect(reorderedTasks[0]).toBe(targetTask);
+    expect(reorderedTasks[1].getAttribute("aria-label")).toMatch(
+      /Design landing page, To Do/
+    );
+    expect(updateTaskApi).not.toHaveBeenCalled();
+  });
+
+  it("supports keyboard reordering and keeps focus on the moved task", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const firstTask = within(getTaskColumn("To Do")).getByRole("article", {
+      name: /Design landing page/,
+    });
+
+    await user.click(firstTask);
+    await user.keyboard("{Enter}{ArrowDown}{Enter}");
+
+    const todoTasks = within(getTaskColumn("To Do")).getAllByRole("article");
+    expect(todoTasks[0].getAttribute("aria-label")).toMatch(
+      /Review project requirements, To Do/
+    );
+    expect(todoTasks[1].getAttribute("aria-label")).toMatch(
+      /Design landing page, To Do/
+    );
+    expect(document.activeElement).toBe(todoTasks[1]);
+    expect(
+      document.querySelector(".task-movement-notification").textContent
+    ).toContain("Design landing page moved to position 2 in To Do.");
+    expect(updateTaskApi).not.toHaveBeenCalled();
+  });
+
+  it("ignores drops for unknown tasks without changing the board", () => {
+    render(<App />);
+    const dataTransfer = createDataTransfer();
+    dataTransfer.setData("text/plain", "missing-task");
+
+    fireEvent.drop(getTaskColumn("In Progress"), { dataTransfer });
+
+    expect(
+      within(getTaskColumn("To Do")).getAllByRole("article")
+    ).toHaveLength(4);
+    expect(
+      within(getTaskColumn("In Progress")).getAllByRole("article")
+    ).toHaveLength(3);
+    expect(updateTaskApi).not.toHaveBeenCalled();
+  });
+
+  it("moves optimistically and rolls back only the failed task", async () => {
+    let rejectFirstMove;
+    updateTaskApi
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve, reject) => {
+            rejectFirstMove = reject;
+          })
+      )
+      .mockResolvedValueOnce({ id: 2, status: "done" });
+
+    render(<App />);
+    const todoColumn = getTaskColumn("To Do");
+    const firstTask = within(todoColumn).getByRole("article", {
+      name: /Design landing page/,
+    });
+    const dataTransfer = dragTaskTo(
+      firstTask,
+      getTaskColumn("In Progress")
+    );
+
+    expect(dataTransfer.getData("text/plain")).toBe("1");
+    expect(
+      within(getTaskColumn("In Progress")).getByRole("article", {
+        name: /Design landing page, In Progress/,
+      })
+    ).toBeTruthy();
+    expect(getTaskColumn("In Progress").querySelector(".task-count").textContent)
+      .toBe("4");
+    expect(getTaskColumn("To Do").querySelector(".task-count").textContent).toBe(
+      "3"
+    );
+
+    const secondTask = within(getTaskColumn("To Do")).getByRole("article", {
+      name: /Review project requirements/,
+    });
+    dragTaskTo(secondTask, getTaskColumn("Done"));
+
+    await waitFor(() => expect(updateTaskApi).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      rejectFirstMove(new Error("Move failed."));
+      await Promise.resolve();
+    });
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "Unable to move Design landing page. Move failed."
+    );
+    expect(
+      within(getTaskColumn("To Do")).getAllByRole("article")[0]
+        .getAttribute("aria-label")
+    ).toMatch(/Design landing page, To Do/);
+    expect(
+      within(getTaskColumn("Done")).getByRole("article", {
+        name: /Review project requirements, Done/,
+      })
+    ).toBeTruthy();
+  });
+
+  it("sequences rapid moves of one task and rolls back to its last saved column", async () => {
+    const requests = [];
+    updateTaskApi.mockImplementation(
+      (taskId, updates) =>
+        new Promise((resolve, reject) => {
+          requests.push({ taskId, updates, resolve, reject });
+        })
+    );
+
+    render(<App />);
+    const firstTask = within(getTaskColumn("To Do")).getByRole("article", {
+      name: /Design landing page/,
+    });
+    dragTaskTo(firstTask, getTaskColumn("In Progress"));
+    await waitFor(() => expect(updateTaskApi).toHaveBeenCalledTimes(1));
+
+    const movedTask = within(getTaskColumn("In Progress")).getByRole("article", {
+      name: /Design landing page/,
+    });
+    dragTaskTo(movedTask, getTaskColumn("Done"));
+
+    expect(
+      within(getTaskColumn("Done")).getByRole("article", {
+        name: /Design landing page, Done/,
+      })
+    ).toBeTruthy();
+    expect(updateTaskApi).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      requests[0].resolve({ id: requests[0].taskId, ...requests[0].updates });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(updateTaskApi).toHaveBeenCalledTimes(2));
+    expect(requests[1].updates).toEqual({ status: "done" });
+
+    await act(async () => {
+      requests[1].reject(new Error("Latest move failed."));
+      await Promise.resolve();
+    });
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "Unable to move Design landing page. Latest move failed."
+    );
+    expect(
+      within(getTaskColumn("In Progress")).getByRole("article", {
+        name: /Design landing page, In Progress/,
+      })
+    ).toBeTruthy();
+    expect(
+      within(getTaskColumn("To Do").querySelector(".column-tasks")).queryByRole(
+        "article",
+        { name: /Design landing page/ }
+      )
+    ).toBeNull();
+  });
+
+  it("saves moves for different tasks independently", async () => {
+    const requests = [];
+    updateTaskApi.mockImplementation(
+      (taskId, updates) =>
+        new Promise((resolve) => {
+          requests.push({ taskId, updates, resolve });
+        })
+    );
+
+    render(<App />);
+    const todoColumn = getTaskColumn("To Do");
+    dragTaskTo(
+      within(todoColumn).getByRole("article", {
+        name: /Design landing page/,
+      }),
+      getTaskColumn("In Progress")
+    );
+    dragTaskTo(
+      within(getTaskColumn("To Do")).getByRole("article", {
+        name: /Review project requirements/,
+      }),
+      getTaskColumn("Done")
+    );
+
+    await waitFor(() => expect(updateTaskApi).toHaveBeenCalledTimes(2));
+    expect(requests.map((request) => request.taskId).sort()).toEqual(["1", "2"]);
+
+    await act(async () => {
+      requests[1].resolve({ id: requests[1].taskId, ...requests[1].updates });
+      requests[0].resolve({ id: requests[0].taskId, ...requests[0].updates });
+      await Promise.resolve();
+    });
+
+    expect(
+      within(getTaskColumn("In Progress")).getByRole("article", {
+        name: /Design landing page, In Progress/,
+      })
+    ).toBeTruthy();
+    expect(
+      within(getTaskColumn("Done")).getByRole("article", {
+        name: /Review project requirements, Done/,
+      })
+    ).toBeTruthy();
   });
 
   it("rounds the completion percentage to a whole number", async () => {
