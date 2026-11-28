@@ -17,6 +17,7 @@ function TaskCard({
   variant = "board",
   onEdit,
   onDelete,
+  isTaskActionDisabled = false,
   isDragging,
   isKeyboardMoving,
   dropPosition,
@@ -110,6 +111,7 @@ function TaskCard({
           type="button"
           className="task-edit-button"
           onClick={(event) => onEdit(task, event.currentTarget)}
+          disabled={isTaskActionDisabled}
           aria-label={`Edit ${task.title}`}
         >
           <Pencil size={14} aria-hidden="true" />
@@ -120,6 +122,7 @@ function TaskCard({
           type="button"
           className="task-delete-button"
           onClick={() => onDelete(task.id)}
+          disabled={isTaskActionDisabled}
           aria-label={`Delete ${task.title}`}
         >
           <Trash2 size={14} aria-hidden="true" />

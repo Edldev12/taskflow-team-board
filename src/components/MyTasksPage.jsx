@@ -20,6 +20,7 @@ function MyTasksPage({
   onEditTask,
   onDeleteTask,
   createButtonRef,
+  isTaskActionDisabled = false,
 }) {
   const tasks = useMemo(
     () =>
@@ -105,6 +106,7 @@ function MyTasksPage({
             ref={createButtonRef}
             className="add-task-button"
             onClick={onCreateTask}
+            disabled={isTaskActionDisabled}
             type="button"
           >
             <span aria-hidden="true">+</span> Add Task
@@ -236,6 +238,7 @@ function MyTasksPage({
                     key={task.id}
                     onEdit={onEditTask}
                     onDelete={onDeleteTask}
+                    isTaskActionDisabled={isTaskActionDisabled}
                   />
                 );
               })}

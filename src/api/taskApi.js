@@ -25,9 +25,14 @@ export async function getTasks() {
 export async function createTask(taskData) {
   await simulateRequest();
 
+  let id = crypto.randomUUID();
+  while (tasks.some((task) => String(task.id) === String(id))) {
+    id = crypto.randomUUID();
+  }
+
   const newTask = {
     ...taskData,
-    id: crypto.randomUUID(),
+    id,
     description: taskData.description || "",
     label: taskData.label || "",
     priority: taskData.priority || "Medium",
@@ -42,23 +47,24 @@ export async function createTask(taskData) {
 export async function updateTask(taskId, updates) {
   await simulateRequest();
 
-  const exists = tasks.some(
+  const taskIndex = tasks.findIndex(
     (task) => String(task.id) === String(taskId)
   );
 
-  if (!exists) {
+  if (taskIndex === -1) {
     throw new Error("Task not found.");
   }
 
-  tasks = tasks.map((task) =>
-    String(task.id) === String(taskId)
-      ? { ...task, ...updates }
-      : task
+  const updatedTask = {
+    ...tasks[taskIndex],
+    ...updates,
+    id: tasks[taskIndex].id,
+  };
+  tasks = tasks.map((task, index) =>
+    index === taskIndex ? updatedTask : task
   );
 
-  return structuredClone(
-    tasks.find((task) => String(task.id) === String(taskId))
-  );
+  return structuredClone(updatedTask);
 }
 
 export async function deleteTask(taskId) {

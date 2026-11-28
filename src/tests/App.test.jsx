@@ -6,11 +6,24 @@ import {
   render,
   screen,
   within,
+  waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import {
+  createTask as createTaskApi,
+  deleteTask as deleteTaskApi,
+  updateTask as updateTaskApi,
+} from "../api/taskApi";
 import App from "../App";
 
+vi.mock("../api/taskApi", () => ({
+  createTask: vi.fn(),
+  deleteTask: vi.fn(),
+  updateTask: vi.fn(),
+}));
+
 let originalWindowMatchMedia;
+let createdTaskId = 0;
 
 async function checkProgressAndReturnToDashboard(user, expected) {
   await user.click(screen.getByRole("link", { name: /Your Progress/ }));
@@ -56,6 +69,19 @@ describe("dashboard task statistics", () => {
   beforeEach(() => {
     localStorage.clear();
     window.history.replaceState({}, "", window.location.pathname);
+    createdTaskId = 0;
+    createTaskApi.mockReset().mockImplementation(async (task) => ({
+      ...task,
+      id: `created-${++createdTaskId}`,
+    }));
+    updateTaskApi.mockReset().mockImplementation(async (taskId, updates) => ({
+      ...updates,
+      id: taskId,
+    }));
+    deleteTaskApi.mockReset().mockImplementation(async (taskId) => ({
+      success: true,
+      id: taskId,
+    }));
   });
 
   afterEach(() => {
@@ -69,6 +95,155 @@ describe("dashboard task statistics", () => {
       window.matchMedia = originalWindowMatchMedia;
     }
     originalWindowMatchMedia = undefined;
+  });
+
+  it("shows a clear validation message and skips the API for a blank title", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /add task/i }));
+    await user.type(screen.getByLabelText("Task Title *"), "   ");
+    await user.click(screen.getByRole("button", { name: "Create Task" }));
+
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Task title is required."
+    );
+    expect(createTaskApi).not.toHaveBeenCalled();
+  });
+
+  it("creates a task in the selected column with the submitted details", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /add task/i }));
+    await user.type(screen.getByLabelText("Task Title *"), "Ship release notes");
+    await user.type(screen.getByLabelText("Description"), "Summarize this release.");
+    await user.type(screen.getByLabelText("Label"), "Release");
+    await user.selectOptions(screen.getByLabelText("Status"), "done");
+    await user.click(screen.getByRole("button", { name: "Create Task" }));
+
+    const doneColumn = screen.getByRole("heading", { name: "Done" }).closest(
+      ".task-column"
+    );
+    expect(
+      await within(doneColumn).findByRole("article", {
+        name: /Ship release notes, Done/,
+      })
+    ).toBeTruthy();
+    expect(within(doneColumn).getByText("4")).toBeTruthy();
+    expect(createTaskApi).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Ship release notes",
+        description: "Summarize this release.",
+        label: "Release",
+        status: "done",
+      })
+    );
+  });
+
+  it("keeps a failed create out of the board and retries without duplicate submits", async () => {
+    let resolveCreate;
+    createTaskApi
+      .mockRejectedValueOnce(new Error("Create failed."))
+      .mockImplementationOnce((task) => new Promise((resolve) => {
+        resolveCreate = () => resolve({
+          ...task,
+          id: "created-after-retry",
+        });
+      }));
+
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: /add task/i }));
+    await user.type(screen.getByLabelText("Task Title *"), "Retry this task");
+    await user.click(screen.getByRole("button", { name: "Create Task" }));
+
+    const error = await screen.findByRole("alert");
+    expect(error.textContent).toContain("Create failed.");
+    expect(
+      screen.queryByRole("article", { name: /Retry this task/ })
+    ).toBeNull();
+
+    await user.click(within(error).getByRole("button", { name: "Retry" }));
+    const savingButton = await screen.findByRole("button", {
+      name: "Saving...",
+    });
+    expect(savingButton.disabled).toBe(true);
+    expect(createTaskApi).toHaveBeenCalledTimes(2);
+    await user.click(savingButton);
+    expect(createTaskApi).toHaveBeenCalledTimes(2);
+    await act(async () => resolveCreate());
+
+    expect(
+      await screen.findByRole("article", {
+        name: "Retry this task, To Do. Press Enter or Space to move.",
+      })
+    ).toBeTruthy();
+    expect(createTaskApi).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves an edited task unchanged after failure and retries the same task", async () => {
+    updateTaskApi
+      .mockRejectedValueOnce(new Error("Update failed."))
+      .mockImplementationOnce(async (taskId, updates) => ({
+        ...updates,
+        id: taskId,
+      }));
+
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Edit Design landing page" }));
+    const dialog = screen.getByRole("dialog", { name: "Edit Task" });
+    const title = within(dialog).getByLabelText("Task Title *");
+    expect(title.value).toBe("Design landing page");
+    await user.clear(title);
+    await user.type(title, "Updated after retry");
+    await user.click(within(dialog).getByRole("button", { name: "Save Changes" }));
+
+    const error = await screen.findByRole("alert");
+    expect(error.textContent).toContain("Update failed.");
+    expect(
+      screen.getByRole("article", { name: /Design landing page, To Do/ })
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("article", { name: /Updated after retry/ })
+    ).toBeNull();
+
+    await user.click(within(error).getByRole("button", { name: "Retry" }));
+    expect(
+      await screen.findByRole("article", { name: /Updated after retry, To Do/ })
+    ).toBeTruthy();
+    expect(updateTaskApi).toHaveBeenCalledTimes(2);
+    expect(updateTaskApi.mock.calls[0][0]).toBe(1);
+    expect(updateTaskApi.mock.calls[1][0]).toBe(1);
+  });
+
+  it("preserves a task after delete failure and removes it on retry", async () => {
+    deleteTaskApi
+      .mockRejectedValueOnce(new Error("Delete failed."))
+      .mockImplementationOnce(async (taskId) => ({ success: true, id: taskId }));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Delete Design landing page" }));
+
+    const error = await screen.findByRole("alert");
+    expect(error.textContent).toContain("Delete failed.");
+    expect(
+      screen.getByRole("article", { name: /Design landing page, To Do/ })
+    ).toBeTruthy();
+
+    await user.click(within(error).getByRole("button", { name: "Retry" }));
+    await screen.findByText("Task deleted.");
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("article", { name: /Design landing page, To Do/ })
+      ).toBeNull();
+    });
+    expect(deleteTaskApi).toHaveBeenCalledTimes(2);
+    expect(deleteTaskApi).toHaveBeenNthCalledWith(1, 1);
+    expect(deleteTaskApi).toHaveBeenNthCalledWith(2, 1);
   });
 
   it("counts tasks across columns and updates after creating and deleting a task", async () => {
@@ -520,6 +695,13 @@ describe("dashboard task statistics", () => {
     await user.type(screen.getByLabelText("Description"), "Keep this list current.");
     await user.click(screen.getByRole("button", { name: "Create Task" }));
 
+    expect(createTaskApi).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Track My Tasks updates",
+        description: "Keep this list current.",
+        status: "todo",
+      })
+    );
     await user.click(screen.getByRole("link", { name: /Dashboard/ }));
     expect(
       screen.getByRole("article", {
@@ -551,6 +733,13 @@ describe("dashboard task statistics", () => {
     await user.selectOptions(within(editDialog).getByLabelText("Status"), "done");
     await user.click(screen.getByRole("button", { name: "Save Changes" }));
 
+    expect(updateTaskApi).toHaveBeenCalledWith(
+      "created-1",
+      expect.objectContaining({
+        title: "Updated My Tasks item",
+        status: "done",
+      })
+    );
     expect(
       within(myTasksPage).getByRole("article", {
         name: "Updated My Tasks item, Done",
@@ -572,6 +761,7 @@ describe("dashboard task statistics", () => {
       })
     );
     expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(deleteTaskApi).not.toHaveBeenCalled();
     expect(
       within(myTasksPage).getByRole("article", {
         name: "Updated My Tasks item, Done",
@@ -585,6 +775,7 @@ describe("dashboard task statistics", () => {
       })
     );
     expect(confirmSpy).toHaveBeenCalledTimes(2);
+    expect(deleteTaskApi).toHaveBeenCalledWith("created-1");
     expect(
       within(myTasksPage).getByRole("group", { name: "Total Tasks" }).textContent
     ).toContain("10");
@@ -699,6 +890,7 @@ describe("dashboard task statistics", () => {
       "Distinctive searchable description"
     );
     await user.click(screen.getByRole("button", { name: "Create Task" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(
       within(myTasksPage).getByRole("heading", {
         name: "No tasks match your search",
@@ -760,6 +952,7 @@ describe("dashboard task statistics", () => {
         });
       }
       await user.click(screen.getByRole("button", { name: "Create Task" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     };
 
     const { unmount } = render(<App />);

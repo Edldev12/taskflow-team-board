@@ -61,6 +61,24 @@ describe("taskApi", () => {
     expect(tasks).toContainEqual(createdTask);
   });
 
+  it("generates distinct IDs and keeps IDs immutable during updates", async () => {
+    const firstTask = await completeRequest(
+      createTask({ title: "First task" })
+    );
+    const secondTask = await completeRequest(
+      createTask({ title: "Second task" })
+    );
+
+    expect(firstTask.id).toBeTruthy();
+    expect(secondTask.id).toBeTruthy();
+    expect(secondTask.id).not.toBe(firstTask.id);
+
+    const updatedTask = await completeRequest(
+      updateTask(1, { id: 99, title: "Updated title" })
+    );
+    expect(updatedTask.id).toBe(1);
+  });
+
   it("updates an existing task", async () => {
     const updatedTask = await completeRequest(
       updateTask(1, { title: "Updated title" })
@@ -105,6 +123,28 @@ describe("taskApi", () => {
 
     const tasks = await completeRequest(getTasks());
     expect(tasks).toHaveLength(20);
+  });
+
+  it("does not commit create, update, or delete when a request fails", async () => {
+    Math.random.mockReturnValue(0.01);
+
+    await expectRequestToReject(
+      createTask({ title: "Failed task" }),
+      "Request failed. Please try again."
+    );
+    await expectRequestToReject(
+      updateTask(1, { title: "Failed update" }),
+      "Request failed. Please try again."
+    );
+    await expectRequestToReject(
+      deleteTask(1),
+      "Request failed. Please try again."
+    );
+
+    Math.random.mockReturnValue(0.5);
+    const response = await completeRequest(getTasks());
+    expect(response).toHaveLength(20);
+    expect(response[0].title).toBe("Design landing page");
   });
 
   it("returns a copy so callers cannot mutate the internal task list", async () => {

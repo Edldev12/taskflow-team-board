@@ -96,6 +96,19 @@
   font-size: 13px;
 }
 
+.task-api-error p {
+  margin: 0 0 8px;
+}
+
+.task-api-error button {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
 .app-layout[data-theme="dark"] .form-error {
   color: #ffb5a9;
 }
@@ -138,6 +151,11 @@
 .task-modal button:focus-visible {
   outline: 3px solid #2876bd;
   outline-offset: 3px;
+}
+
+.task-modal button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Mobile */

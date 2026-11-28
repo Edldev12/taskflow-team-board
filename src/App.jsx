@@ -1,5 +1,10 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  createTask as createTaskRequest,
+  deleteTask as deleteTaskRequest,
+  updateTask as updateTaskRequest,
+} from "./api/taskApi";
 import CalendarPage from "./components/CalendarPage";
 import Header from "./components/Header";
 import HelpCenter from "./components/HelpCenter";
@@ -373,6 +378,10 @@ function App() {
   const [defaultTaskDueDate, setDefaultTaskDueDate] = useState("");
   const [notifications, setNotifications] = useState(loadNotifications);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isTaskRequestPending, setIsTaskRequestPending] = useState(false);
+  const [taskRequestMessage, setTaskRequestMessage] = useState("");
+  const [taskApiError, setTaskApiError] = useState("");
+  const [taskFeedback, setTaskFeedback] = useState("");
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dropTargetColumnId, setDropTargetColumnId] = useState(null);
   const [dropIndicator, setDropIndicator] = useState(null);
@@ -383,6 +392,9 @@ function App() {
   const taskCardRefs = useRef(new Map());
   const pendingKeyboardFocusTaskId = useRef(null);
   const lastTaskAnnouncementRef = useRef(null);
+  const taskRequestPendingRef = useRef(false);
+  const retryTaskRequestRef = useRef(null);
+  const columnsRef = useRef(columns);
   const [selectedTask, setSelectedTask] = useState(null);
   const taskStats = useMemo(() => {
     const counts = columns.reduce(
@@ -407,6 +419,10 @@ function App() {
           ? 0
           : Math.round((counts.completed / counts.total) * 100),
     };
+  }, [columns]);
+
+  useLayoutEffect(() => {
+    columnsRef.current = columns;
   }, [columns]);
 
   useLayoutEffect(() => {
@@ -582,6 +598,10 @@ function App() {
   }
 
   function openCreateModal() {
+    if (taskRequestPendingRef.current) return;
+    setTaskApiError("");
+    setTaskFeedback("");
+    retryTaskRequestRef.current = null;
     returnFocusRef.current = triggerRef.current;
     setSelectedTask(null);
     const todoTaskCount =
@@ -593,6 +613,10 @@ function App() {
   }
 
   function openEditModal(task, triggerElement) {
+    if (taskRequestPendingRef.current) return;
+    setTaskApiError("");
+    setTaskFeedback("");
+    retryTaskRequestRef.current = null;
     returnFocusRef.current = triggerElement;
     setSelectedTask(task);
     setIsModalOpen(true);
@@ -603,83 +627,160 @@ function App() {
     setSelectedTask(null);
   }
 
-  function saveTask(taskData) {
-    if (selectedTask) {
-      const sourceColumn = columns.find((column) =>
-        column.tasks.some(
-          (task) => String(task.id) === String(selectedTask.id)
-        )
-      );
-      const destinationColumn = columns.find(
-        (column) => column.id === taskData.status
-      );
-      const updatedColumns = columns.map((column) => ({
-        ...column,
-        tasks: column.tasks.map((task) =>
-          task.id === selectedTask.id ? { ...task, ...taskData } : task
-        ),
-      }));
-      const nextColumns =
-        sourceColumn &&
-          destinationColumn &&
-          sourceColumn.id !== destinationColumn.id
-          ? moveTaskToPosition(
-            updatedColumns,
-            selectedTask.id,
-            destinationColumn.id,
-            destinationColumn.tasks.length
-          )
-          : updatedColumns;
+  async function runTaskRequest(
+    request,
+    onSuccess,
+    loadingMessage,
+    successMessage
+  ) {
+    if (taskRequestPendingRef.current) return false;
 
-      recordTaskStatusChange(columns, nextColumns, selectedTask.id);
-      addNotification(`Task updated: ${taskData.title}.`);
-      setColumns(nextColumns);
-    } else {
-      // Create new task in To Do
-      const newTask = {
-        id: crypto.randomUUID(),
-        ...taskData,
-        dueDate:
-          taskData.dueDate ||
-          getStatusBasedDueDate(
-            "todo",
-            columns.find((column) => column.id === "todo")?.tasks.length || 0
-          ),
-        status: "todo",
+    taskRequestPendingRef.current = true;
+    setIsTaskRequestPending(true);
+    setTaskRequestMessage(loadingMessage);
+    setTaskApiError("");
+    setTaskFeedback("");
+
+    let response;
+    try {
+      response = await request();
+    } catch (error) {
+      setTaskApiError(
+        error instanceof Error && error.message
+          ? error.message
+          : "The task request failed. Please try again."
+      );
+      retryTaskRequestRef.current = () => {
+        void runTaskRequest(
+          request,
+          onSuccess,
+          loadingMessage,
+          successMessage
+        );
       };
-
-      addNotification(`Task created: ${newTask.title}.`);
-      setColumns((previousColumns) =>
-        previousColumns.map((column) =>
-          column.id === "todo"
-            ? { ...column, tasks: [...column.tasks, newTask] }
-            : column
-        )
-      );
+      return false;
+    } finally {
+      taskRequestPendingRef.current = false;
+      setIsTaskRequestPending(false);
+      setTaskRequestMessage("");
     }
 
-    closeModal();
+    retryTaskRequestRef.current = null;
+    setTaskApiError("");
+    onSuccess(response);
+    setTaskFeedback(successMessage);
+    return true;
+  }
+
+  function saveTask(taskData) {
+    const editingTask = selectedTask;
+    const status = taskData.status || "todo";
+    const statusTaskCount =
+      columnsRef.current.find((column) => column.id === status)?.tasks.length ||
+      0;
+    const taskPayload = {
+      ...taskData,
+      description: taskData.description.trim(),
+      dueDate:
+        taskData.dueDate || getStatusBasedDueDate(status, statusTaskCount),
+      label: taskData.label.trim(),
+      status,
+    };
+    const request = editingTask
+      ? () => updateTaskRequest(editingTask.id, taskPayload)
+      : () => createTaskRequest(taskPayload);
+    const onSuccess = (savedTask) => {
+      if (editingTask) {
+        const currentColumns = columnsRef.current;
+        const updatedTask = {
+          ...editingTask,
+          ...savedTask,
+          id: editingTask.id,
+        };
+        const sourceColumn = currentColumns.find((column) =>
+          column.tasks.some(
+            (task) => String(task.id) === String(editingTask.id)
+          )
+        );
+        const destinationColumn = currentColumns.find(
+          (column) => column.id === updatedTask.status
+        );
+        const updatedColumns = currentColumns.map((column) => ({
+          ...column,
+          tasks: column.tasks.map((task) =>
+            String(task.id) === String(editingTask.id) ? updatedTask : task
+          ),
+        }));
+        const nextColumns =
+          sourceColumn &&
+          destinationColumn &&
+          sourceColumn.id !== destinationColumn.id
+            ? moveTaskToPosition(
+                updatedColumns,
+                editingTask.id,
+                destinationColumn.id,
+                destinationColumn.tasks.length
+              )
+            : updatedColumns;
+
+        recordTaskStatusChange(currentColumns, nextColumns, editingTask.id);
+        addNotification(`Task updated: ${updatedTask.title}.`);
+        setColumns(nextColumns);
+      } else {
+        const createdTask = { ...taskPayload, ...savedTask };
+        const targetColumn = createdTask.status || "todo";
+        setColumns((previousColumns) =>
+          previousColumns.map((column) =>
+            column.id === targetColumn &&
+            !column.tasks.some(
+              (task) => String(task.id) === String(createdTask.id)
+            )
+              ? { ...column, tasks: [...column.tasks, createdTask] }
+              : column
+          )
+        );
+        addNotification(`Task created: ${createdTask.title}.`);
+      }
+
+      closeModal();
+    };
+
+    void runTaskRequest(
+      request,
+      onSuccess,
+      editingTask ? "Saving task..." : "Creating task...",
+      editingTask ? "Task updated." : "Task created."
+    );
   }
 
   function deleteTask(taskId) {
+    if (taskRequestPendingRef.current) return;
     const confirmed = window.confirm(
       "Are you sure you want to delete this task?"
     );
 
     if (!confirmed) return;
 
-    const deletedTask = columns
+    const deletedTask = columnsRef.current
       .flatMap((column) => column.tasks)
-      .find((task) => task.id === taskId);
-    if (deletedTask) {
-      addNotification(`Task deleted: ${deletedTask.title}.`);
-    }
+      .find((task) => String(task.id) === String(taskId));
+    if (!deletedTask) return;
 
-    setColumns((previousColumns) =>
-      previousColumns.map((column) => ({
-        ...column,
-        tasks: column.tasks.filter((task) => task.id !== taskId),
-      }))
+    void runTaskRequest(
+      () => deleteTaskRequest(taskId),
+      () => {
+        setColumns((previousColumns) =>
+          previousColumns.map((column) => ({
+            ...column,
+            tasks: column.tasks.filter(
+              (task) => String(task.id) !== String(taskId)
+            ),
+          }))
+        );
+        addNotification(`Task deleted: ${deletedTask.title}.`);
+      },
+      "Deleting task...",
+      "Task deleted."
     );
   }
 
@@ -997,6 +1098,29 @@ function App() {
           onNotificationsRead={markNotificationsRead}
         />
 
+        {isTaskRequestPending && (
+          <p className="task-request-status" role="status" aria-live="polite">
+            {taskRequestMessage}
+          </p>
+        )}
+        {taskApiError && !isModalOpen && (
+          <div className="task-request-error" role="alert">
+            <p>{taskApiError}</p>
+            <button
+              type="button"
+              onClick={() => retryTaskRequestRef.current?.()}
+              disabled={isTaskRequestPending || !retryTaskRequestRef.current}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        {taskFeedback && (
+          <p className="task-request-feedback" role="status" aria-live="polite">
+            {taskFeedback}
+          </p>
+        )}
+
         {activePage === "help" ? (
           <HelpCenter onReturnToDashboard={() => setActivePage("dashboard")} />
         ) : activePage === "settings" ? (
@@ -1035,6 +1159,7 @@ function App() {
             onEditTask={openEditModal}
             onDeleteTask={deleteTask}
             createButtonRef={triggerRef}
+            isTaskActionDisabled={isTaskRequestPending}
           />
         ) : (
           <section className="dashboard-content" id="dashboard">
@@ -1053,6 +1178,7 @@ function App() {
                 ref={triggerRef}
                 className="add-task-button"
                 onClick={openCreateModal}
+                disabled={isTaskRequestPending}
                 type="button"
               >
                 <span>+</span> Add Task
@@ -1074,6 +1200,7 @@ function App() {
                   searchQuery={taskSearchQuery}
                   onEdit={openEditModal}
                   onDelete={deleteTask}
+                  isTaskActionDisabled={isTaskRequestPending}
                   draggedTaskId={draggedTaskId}
                   dropIndicator={dropIndicator}
                   keyboardMove={keyboardMove}
@@ -1126,6 +1253,13 @@ function App() {
             isOpen={isModalOpen}
             onClose={closeModal}
             onSave={saveTask}
+            onClearApiError={() => {
+              setTaskApiError("");
+              retryTaskRequestRef.current = null;
+            }}
+            onRetry={() => retryTaskRequestRef.current?.()}
+            apiError={taskApiError}
+            isSaving={isTaskRequestPending}
             task={selectedTask}
             defaultDueDate={defaultTaskDueDate}
             returnFocusRef={returnFocusRef}
