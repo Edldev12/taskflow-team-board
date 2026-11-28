@@ -1,8 +1,11 @@
-const STORAGE_KEY = "taskflow-team-board.columns";
+export const TASK_STORAGE_KEY = "taskflow-team-board.columns";
 
 export function saveTasks(columns) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(columns));
+    const serializedColumns = JSON.stringify(columns);
+    if (localStorage.getItem(TASK_STORAGE_KEY) === serializedColumns) return true;
+
+    localStorage.setItem(TASK_STORAGE_KEY, serializedColumns);
     return true;
   } catch (error) {
     console.error("Failed to save tasks:", error);
@@ -12,9 +15,9 @@ export function saveTasks(columns) {
 
 export function loadTasks() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(TASK_STORAGE_KEY);
 
-    if (!saved) return null;
+    if (saved === null) return null;
 
     const columns = JSON.parse(saved);
 
@@ -31,7 +34,7 @@ export function loadTasks() {
 
 export function subscribeToTaskChanges(callback) {
   function handleStorageChange(event) {
-    if (event.key !== STORAGE_KEY || !event.newValue) return;
+    if (event.key !== TASK_STORAGE_KEY || !event.newValue) return;
 
     try {
       const columns = JSON.parse(event.newValue);

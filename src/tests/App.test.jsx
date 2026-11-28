@@ -1041,6 +1041,284 @@ describe("dashboard task statistics", () => {
     ).toBeNull();
   });
 
+  it("synchronizes validated storage changes across Board, My Tasks, and Calendar", async () => {
+    const user = userEvent.setup();
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+    const firstRender = render(<App />);
+
+    const columns = JSON.parse(
+      localStorage.getItem("taskflow-team-board.columns")
+    );
+    const task = columns.find((column) => column.id === "todo").tasks.shift();
+    const today = new Date();
+    const dueDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    columns.find((column) => column.id === "done").tasks.push({
+      ...task,
+      title: "Updated from another tab",
+      status: "done",
+      dueDate,
+    });
+    const serializedColumns = JSON.stringify(columns);
+
+    localStorage.setItem("taskflow-team-board.columns", serializedColumns);
+    setItemSpy.mockClear();
+    fireEvent(
+      window,
+      new StorageEvent("storage", {
+        key: "taskflow-team-board.columns",
+        newValue: serializedColumns,
+        storageArea: localStorage,
+      })
+    );
+
+    expect(
+      screen.getByRole("article", {
+        name: /Updated from another tab, Done/,
+      })
+    ).toBeTruthy();
+    expect(setItemSpy).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+    expect(
+      screen.getByRole("article", { name: "Updated from another tab, Done" })
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+    const calendarTable = screen.getByRole("table", {
+      name: new Intl.DateTimeFormat(undefined, {
+        month: "long",
+        year: "numeric",
+      }).format(today) + " calendar",
+    });
+    const accessibleDate = new Intl.DateTimeFormat(undefined, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }).format(today);
+    const todayCell = within(calendarTable).getByRole("cell", {
+      name: accessibleDate,
+    });
+    await user.click(
+      within(todayCell).getByRole("button", {
+        name: new RegExp(`^Select ${accessibleDate}`),
+      })
+    );
+    const selectedDay = screen.getByRole("region", {
+      name: `Tasks for ${accessibleDate}`,
+    });
+    expect(
+      within(selectedDay).getByRole("button", {
+        name: `Updated from another tab, Done, High priority, due ${dueDate}. View task details`,
+      })
+    ).toBeTruthy();
+
+    const updatedColumns = JSON.parse(
+      localStorage.getItem("taskflow-team-board.columns")
+    );
+    expect(
+      updatedColumns
+        .flatMap((column) => column.tasks)
+        .find((item) => item.title === "Updated from another tab").dueDate
+    ).toBe(dueDate);
+
+    const staleColumns = JSON.parse(serializedColumns);
+    staleColumns.find((column) => column.id === "done").tasks[0].title =
+      "Older tab snapshot";
+    fireEvent(
+      window,
+      new StorageEvent("storage", {
+        key: "taskflow-team-board.columns",
+        newValue: JSON.stringify(staleColumns),
+      })
+    );
+    expect(
+      within(selectedDay).getByRole("button", {
+        name: new RegExp("^Updated from another tab, Done"),
+      })
+    ).toBeTruthy();
+    await user.click(screen.getByRole("link", { name: /Dashboard/ }));
+    expect(
+      screen.getByRole("article", { name: /Set up React project, Done/ })
+    ).toBeTruthy();
+
+    firstRender.unmount();
+    render(<App />);
+    expect(
+      screen.getByRole("article", {
+        name: /Updated from another tab, Done/,
+      })
+    ).toBeTruthy();
+
+    const invalidColumns = [...updatedColumns];
+    invalidColumns[0] = {
+      ...invalidColumns[0],
+      tasks: [...invalidColumns[0].tasks, updatedColumns[2].tasks[0]],
+    };
+    const invalidSerializedColumns = JSON.stringify(invalidColumns);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    localStorage.setItem(
+      "taskflow-team-board.columns",
+      invalidSerializedColumns
+    );
+    fireEvent(
+      window,
+      new StorageEvent("storage", {
+        key: "taskflow-team-board.columns",
+        newValue: invalidSerializedColumns,
+      })
+    );
+
+    expect(
+      screen.getByRole("article", {
+        name: /Updated from another tab, Done/,
+      })
+    ).toBeTruthy();
+    expect(
+      JSON.parse(localStorage.getItem("taskflow-team-board.columns"))
+    ).toEqual(updatedColumns);
+  });
+
+  it("reflects board moves and deletions in My Tasks and Calendar", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<App />);
+
+    const storedColumns = JSON.parse(
+      localStorage.getItem("taskflow-team-board.columns")
+    );
+    const task = storedColumns[0].tasks.find((item) => item.id === 1);
+    const [year, month, day] = task.dueDate.split("-").map(Number);
+    const dueDateLabel = new Intl.DateTimeFormat(undefined, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }).format(new Date(year, month - 1, day));
+    const taskCard = screen.getByRole("article", {
+      name: /Design landing page, To Do/,
+    });
+
+    await user.click(taskCard);
+    await user.keyboard("{Enter}{ArrowRight}{ArrowRight}{Enter}");
+    expect(updateTaskApi).toHaveBeenCalledWith(1, { status: "done" });
+
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+    const myTasksPage = screen.getByRole("region", { name: "My Tasks" });
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Design landing page, Done",
+      })
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+    const calendarTable = screen.getByRole("table");
+    const dueDateCell = within(calendarTable).getByRole("cell", {
+      name: dueDateLabel,
+    });
+    await user.click(
+      within(dueDateCell).getByRole("button", {
+        name: new RegExp(`^Select ${dueDateLabel}`),
+      })
+    );
+    let selectedDay = screen.getByRole("region", {
+      name: `Tasks for ${dueDateLabel}`,
+    });
+    expect(
+      within(selectedDay).getByRole("button", {
+        name: new RegExp("^Design landing page, Done"),
+      })
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+    await user.click(
+      screen.getByRole("button", { name: "Delete Design landing page" })
+    );
+    expect(deleteTaskApi).toHaveBeenCalledWith(1);
+    expect(
+      screen.queryByRole("article", { name: "Design landing page, Done" })
+    ).toBeNull();
+
+    await user.click(screen.getByRole("link", { name: /Calendar/ }));
+    const refreshedCalendarTable = screen.getByRole("table");
+    const refreshedDueDateCell = within(refreshedCalendarTable).getByRole(
+      "cell",
+      { name: dueDateLabel }
+    );
+    await user.click(
+      within(refreshedDueDateCell).getByRole("button", {
+        name: new RegExp(`^Select ${dueDateLabel}`),
+      })
+    );
+    selectedDay = screen.getByRole("region", {
+      name: `Tasks for ${dueDateLabel}`,
+    });
+    expect(
+      within(selectedDay).queryByRole("button", {
+        name: new RegExp("^Design landing page, Done"),
+      })
+    ).toBeNull();
+  });
+
+  it("keeps a newer tab snapshot when an earlier optimistic move fails", async () => {
+    let rejectMove;
+    updateTaskApi.mockImplementationOnce(
+      () =>
+        new Promise((resolve, reject) => {
+          rejectMove = reject;
+        })
+    );
+    render(<App />);
+
+    dragTaskTo(
+      screen.getByRole("article", { name: /Design landing page, To Do/ }),
+      getTaskColumn("In Progress")
+    );
+    await waitFor(() => expect(updateTaskApi).toHaveBeenCalledTimes(1));
+
+    const externalColumns = JSON.parse(
+      localStorage.getItem("taskflow-team-board.columns")
+    );
+    const inProgressTasks = externalColumns.find(
+      (column) => column.id === "in-progress"
+    ).tasks;
+    const taskIndex = inProgressTasks.findIndex((task) => task.id === 1);
+    const task = inProgressTasks.splice(taskIndex, 1)[0];
+    externalColumns.find((column) => column.id === "done").tasks.push({
+      ...task,
+      title: "Newer external update",
+      status: "done",
+    });
+    const serializedColumns = JSON.stringify(externalColumns);
+    localStorage.setItem("taskflow-team-board.columns", serializedColumns);
+    fireEvent(
+      window,
+      new StorageEvent("storage", {
+        key: "taskflow-team-board.columns",
+        newValue: serializedColumns,
+        storageArea: localStorage,
+      })
+    );
+
+    expect(
+      screen.getByRole("article", {
+        name: /Newer external update, Done/,
+      })
+    ).toBeTruthy();
+
+    await act(async () => {
+      rejectMove(new Error("Earlier move failed."));
+      await Promise.resolve();
+    });
+
+    expect(
+      screen.getByRole("article", {
+        name: /Newer external update, Done/,
+      })
+    ).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("filters My Tasks by status and priority together and clears unmatched filters", async () => {
     const user = userEvent.setup();
     render(<App />);

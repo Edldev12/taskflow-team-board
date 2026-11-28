@@ -20,6 +20,12 @@ import {
 } from "./utils/applicationPreferencesStorage";
 import { loadProfile, saveProfile } from "./utils/profileStorage";
 import {
+  TASK_STORAGE_KEY,
+  loadTasks,
+  saveTasks,
+  subscribeToTaskChanges,
+} from "./utils/taskStorage";
+import {
   assignMissingDueDates,
   getStatusBasedDueDate,
   isValidDueDate,
@@ -59,7 +65,6 @@ const taskColumns = [
   },
 ];
 
-const TASK_COLUMNS_STORAGE_KEY = "taskflow-team-board.columns";
 const NOTIFICATIONS_STORAGE_KEY = "taskflow-team-board.notifications";
 const THEME_PREFERENCE_STORAGE_KEY =
   document.documentElement.dataset.themeStorageKey ||
@@ -123,64 +128,65 @@ function getSystemTheme() {
     : "light";
 }
 
-function loadTaskColumns() {
-  try {
-    const savedColumns = window.localStorage.getItem(TASK_COLUMNS_STORAGE_KEY);
-    if (savedColumns === null) {
-      return assignMissingDueDates(taskColumns);
+function normalizeTaskColumns(parsedColumns) {
+  if (!Array.isArray(parsedColumns)) {
+    throw new Error("Saved task columns are not a list.");
+  }
+
+  const restoredColumns = taskColumns.map((column) => {
+    const savedColumn = parsedColumns.find((item) => item?.id === column.id);
+
+    if (!savedColumn || !Array.isArray(savedColumn.tasks)) {
+      throw new Error(`Saved tasks for "${column.id}" are invalid.`);
     }
 
-    const parsedColumns = JSON.parse(savedColumns);
-    if (!Array.isArray(parsedColumns)) {
-      throw new Error("Saved task columns are not a list.");
-    }
-
-    const restoredColumns = taskColumns.map((column) => {
-      const savedColumn = parsedColumns.find(
-        (item) => item?.id === column.id
-      );
-
-      if (!savedColumn || !Array.isArray(savedColumn.tasks)) {
-        throw new Error(`Saved tasks for "${column.id}" are invalid.`);
-      }
-
-      return {
-        ...column,
-        tasks: savedColumn.tasks.map((task) => {
-          if (
-            !task ||
-            (typeof task.id !== "string" && typeof task.id !== "number") ||
-            typeof task.title !== "string" ||
-            typeof task.label !== "string" ||
-            typeof task.priority !== "string" ||
-            (task.dueDate != null &&
-              task.dueDate !== "" &&
-              !isValidDueDate(task.dueDate))
-          ) {
-            throw new Error(`A saved task in "${column.id}" is invalid.`);
-          }
-
-          return {
-            ...task,
-            dueDate: task.dueDate ?? "",
-            status: column.id,
-          };
-        }),
-      };
-    });
-
-    const taskIds = new Set();
-    for (const column of restoredColumns) {
-      for (const task of column.tasks) {
-        const taskId = String(task.id);
-        if (taskIds.has(taskId)) {
-          throw new Error(`Saved task ID "${taskId}" appears more than once.`);
+    return {
+      ...column,
+      tasks: savedColumn.tasks.map((task) => {
+        if (
+          !task ||
+          (typeof task.id !== "string" && typeof task.id !== "number") ||
+          typeof task.title !== "string" ||
+          typeof task.label !== "string" ||
+          typeof task.priority !== "string" ||
+          (task.dueDate != null &&
+            task.dueDate !== "" &&
+            !isValidDueDate(task.dueDate))
+        ) {
+          throw new Error(`A saved task in "${column.id}" is invalid.`);
         }
-        taskIds.add(taskId);
-      }
-    }
 
-    return assignMissingDueDates(restoredColumns);
+        return {
+          ...task,
+          dueDate: task.dueDate ?? "",
+          status: column.id,
+        };
+      }),
+    };
+  });
+
+  const taskIds = new Set();
+  for (const column of restoredColumns) {
+    for (const task of column.tasks) {
+      const taskId = String(task.id);
+      if (taskIds.has(taskId)) {
+        throw new Error(`Saved task ID "${taskId}" appears more than once.`);
+      }
+      taskIds.add(taskId);
+    }
+  }
+
+  return assignMissingDueDates(restoredColumns);
+}
+
+function loadTaskColumns() {
+  const savedColumns = loadTasks();
+  if (savedColumns === null) {
+    return assignMissingDueDates(taskColumns);
+  }
+
+  try {
+    return normalizeTaskColumns(savedColumns);
   } catch (error) {
     console.error("Unable to restore the saved task board.", error);
     return assignMissingDueDates(taskColumns);
@@ -494,15 +500,48 @@ function App() {
     return () => window.clearTimeout(timeoutId);
   }, [taskAnnouncement]);
 
+  useEffect(
+    () =>
+      subscribeToTaskChanges((savedColumns) => {
+        let synchronizedColumns;
+        try {
+          const latestSavedValue = window.localStorage.getItem(
+            TASK_STORAGE_KEY
+          );
+          if (
+            latestSavedValue === null ||
+            JSON.stringify(JSON.parse(latestSavedValue)) !==
+              JSON.stringify(savedColumns)
+          ) {
+            return;
+          }
+
+          synchronizedColumns = normalizeTaskColumns(savedColumns);
+        } catch (error) {
+          console.error("Unable to synchronize saved task columns.", error);
+          saveTasks(columnsRef.current);
+          return;
+        }
+
+        if (
+          JSON.stringify(synchronizedColumns) ===
+          JSON.stringify(columnsRef.current)
+        ) {
+          return;
+        }
+
+        cancelPendingTaskMoves();
+        setDraggedTaskId(null);
+        setDropTargetColumnId(null);
+        setDropIndicator(null);
+        setKeyboardMove(null);
+        commitTaskColumns(synchronizedColumns);
+      }),
+    []
+  );
+
   useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        TASK_COLUMNS_STORAGE_KEY,
-        JSON.stringify(columns)
-      );
-    } catch (error) {
-      console.error("Unable to save the task board.", error);
-    }
+    saveTasks(columns);
   }, [columns]);
 
   useEffect(() => {
@@ -799,6 +838,11 @@ function App() {
     setColumns(nextColumns);
   }
 
+  function cancelPendingTaskMoves() {
+    taskMoveQueuesRef.current.clear();
+    setPendingTaskMoveCount(0);
+  }
+
   function moveTask(taskId, destinationColumnId, insertionIndex, focusAfterMove = false) {
     if (taskRequestPendingRef.current) return;
 
@@ -847,11 +891,14 @@ function App() {
     moveState.sequence += 1;
     const sequence = moveState.sequence;
     const destinationId = nextPosition.columnId;
-    moveState.queue = moveState.queue.then(
-      () => updateTaskRequest(taskId, { status: destinationId }),
-      () => updateTaskRequest(taskId, { status: destinationId })
-    ).then(
+    const requestMove = () =>
+      taskMoveQueuesRef.current.get(taskKey) === moveState
+        ? updateTaskRequest(taskId, { status: destinationId })
+        : undefined;
+    moveState.queue = moveState.queue.then(requestMove, requestMove).then(
       () => {
+        if (taskMoveQueuesRef.current.get(taskKey) !== moveState) return;
+
         const confirmedPosition = nextPosition;
         const previousConfirmedPosition = moveState.confirmedPosition;
         moveState.confirmedPosition = confirmedPosition;
@@ -879,7 +926,10 @@ function App() {
         setPendingTaskMoveCount(taskMoveQueuesRef.current.size);
       },
       (error) => {
-        if (moveState.sequence !== sequence) return;
+        if (
+          taskMoveQueuesRef.current.get(taskKey) !== moveState ||
+          moveState.sequence !== sequence
+        ) return;
 
         const latestColumns = columnsRef.current;
         const rollbackColumns = moveTaskToPosition(
