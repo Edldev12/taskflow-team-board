@@ -1376,6 +1376,50 @@ describe("dashboard task statistics", () => {
     expect(within(myTasksPage).getAllByRole("article")).toHaveLength(10);
   });
 
+  it("filters by label, clears filters, and restores filters from the URL", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("link", { name: /My Tasks/ }));
+
+    const myTasksPage = screen.getByRole("region", { name: "My Tasks" });
+    const labelFilter = within(myTasksPage).getByLabelText("Label");
+    const statusFilter = within(myTasksPage).getByLabelText("Status");
+    const priorityFilter = within(myTasksPage).getByLabelText("Priority");
+
+    await user.selectOptions(labelFilter, "Design");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(2);
+    expect(within(myTasksPage).getByText("Showing 2 of 10 tasks")).toBeTruthy();
+    expect(window.location.search).toContain("label=Design");
+    expect(
+      within(myTasksPage).getByRole("group", { name: "Total Tasks" }).textContent
+    ).toContain("10");
+
+    await user.click(
+      within(myTasksPage).getByRole("button", { name: "Clear Filters" })
+    );
+    expect(labelFilter.value).toBe("all");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(10);
+    expect(window.location.search).toBe("");
+
+    window.history.replaceState(
+      window.history.state,
+      "",
+      "?status=done&label=Planning&priority=Low"
+    );
+    fireEvent.popState(window);
+
+    expect(statusFilter.value).toBe("done");
+    expect(labelFilter.value).toBe("Planning");
+    expect(priorityFilter.value).toBe("Low");
+    expect(within(myTasksPage).getAllByRole("article")).toHaveLength(1);
+    expect(
+      within(myTasksPage).getByRole("article", {
+        name: "Create project structure, Done",
+      })
+    ).toBeTruthy();
+  });
+
   it("searches task titles, descriptions, and labels with filters and updates live", async () => {
     const user = userEvent.setup();
     render(<App />);

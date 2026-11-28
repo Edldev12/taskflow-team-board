@@ -43,6 +43,21 @@ describe("taskApi", () => {
     });
   });
 
+  it("waits for the configured delay before resolving a request", async () => {
+    let requestResolved = false;
+    const request = getTasks().then((tasks) => {
+      requestResolved = true;
+      return tasks;
+    });
+
+    await vi.advanceTimersByTimeAsync(REQUEST_DELAY - 1);
+    expect(requestResolved).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await request).toHaveLength(20);
+    expect(requestResolved).toBe(true);
+  });
+
   it("creates a task with default values", async () => {
     const createdTask = await completeRequest(
       createTask({ title: "Write tests" })
